@@ -18,5 +18,5 @@ export const config: Phaser.Types.Core.GameConfig = {
       debug: false,
     },
   },
-  scene: [MenuScene, StadiumScene, GameOverScene],
+  scene: [StadiumScene, MenuScene, GameOverScene],
 };
