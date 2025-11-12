@@ -1,3 +1,19 @@
+/**
+ * Local Development:
+ * 1. Install Vercel CLI: npm i -g vercel
+ * 2. Run: vercel dev
+ * 3. Access: http://localhost:3000
+ * 
+ * The Vercel CLI will:
+ * - Serve the Vite app
+ * - Run this serverless function at /api/announcer
+ * - Load env vars from .env.local
+ * 
+ * Production:
+ * - Add ANTHROPIC_API_KEY in Vercel dashboard
+ * - Deploy: vercel --prod
+ */
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 /**
