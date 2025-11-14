@@ -1,6 +1,7 @@
 import { WaveManager } from '@/managers/WaveManager';
 import { GameStateManager } from '@/managers/GameStateManager';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { gameBalance } from '@/config/gameBalance';
 
 // Test subclass that allows us to control random rolls
 class TestWaveManager extends WaveManager {
@@ -22,7 +23,8 @@ describe('WaveManager', () => {
     });
 
     it('should have countdown at triggerCountdown seconds initially', () => {
-      expect(waveManager.getCountdown()).toBe(3); // 3000ms / 1000
+      const expectedSeconds = gameBalance.waveTiming.triggerCountdown / 1000;
+      expect(waveManager.getCountdown()).toBe(expectedSeconds);
     });
   });
 
@@ -30,7 +32,8 @@ describe('WaveManager', () => {
     it('should activate wave and reset countdown to triggerCountdown', () => {
       waveManager.startWave();
       expect(waveManager.isActive()).toBe(true);
-      expect(waveManager.getCountdown()).toBe(3);
+      const expectedSeconds = gameBalance.waveTiming.triggerCountdown / 1000;
+      expect(waveManager.getCountdown()).toBe(expectedSeconds);
     });
 
     it('should start at section 0 (Section A)', () => {
@@ -43,7 +46,8 @@ describe('WaveManager', () => {
     it('should decrease countdown over time by seconds', () => {
       waveManager.startWave();
       waveManager.updateCountdown(1000); // 1 second
-      expect(waveManager.getCountdown()).toBe(2);
+      const expectedSeconds = gameBalance.waveTiming.triggerCountdown / 1000;
+      expect(waveManager.getCountdown()).toBe(expectedSeconds - 1);
     });
 
     it('should trigger wave propagation when countdown reaches 0', () => {

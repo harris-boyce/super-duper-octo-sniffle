@@ -31,6 +31,7 @@ export class StadiumScene extends Phaser.Scene {
   private waveStrengthMeter?: Phaser.GameObjects.Container;
   private forceSputterNextSection: boolean = false;
   private debugEventLog: string[] = [];
+  private hasLoggedUpdate: boolean = false;
 
   constructor() {
     super({ key: 'StadiumScene' });
@@ -124,7 +125,8 @@ export class StadiumScene extends Phaser.Scene {
       fontFamily: 'Arial',
       color: '#ffffff',
     }).setOrigin(0.5, 0.5);
-    this.sectionAText = this.add.text(200, 420, '', {
+    const statOffsetY = 300 + 100 + gameBalance.waveAutonomous.sectionStatOffsetY; // section Y + baseline offset + config offset
+    this.sectionAText = this.add.text(200, statOffsetY, '', {
       fontSize: '16px',
       fontFamily: 'Arial',
       color: '#ffffff',
@@ -135,7 +137,7 @@ export class StadiumScene extends Phaser.Scene {
       fontFamily: 'Arial',
       color: '#ffffff',
     }).setOrigin(0.5, 0.5);
-    this.sectionBText = this.add.text(500, 420, '', {
+    this.sectionBText = this.add.text(500, statOffsetY, '', {
       fontSize: '16px',
       fontFamily: 'Arial',
       color: '#ffffff',
@@ -146,7 +148,7 @@ export class StadiumScene extends Phaser.Scene {
       fontFamily: 'Arial',
       color: '#ffffff',
     }).setOrigin(0.5, 0.5);
-    this.sectionCText = this.add.text(800, 420, '', {
+    this.sectionCText = this.add.text(800, statOffsetY, '', {
       fontSize: '16px',
       fontFamily: 'Arial',
       color: '#ffffff',
@@ -198,16 +200,24 @@ export class StadiumScene extends Phaser.Scene {
     // Setup wave button listener
     const waveBtn = document.getElementById('wave-btn') as HTMLButtonElement;
     if (waveBtn) {
-      waveBtn.addEventListener('click', () => {
-        if (!this.waveManager.isActive() && this.gameState.getSessionState() === 'active') {
-          this.waveManager.startWave();
-          waveBtn.disabled = true;
-          waveBtn.textContent = 'WAVE IN PROGRESS...';
-        }
-      });
-    }
-
-    // Setup Force Sputter button
+      // Only show START WAVE button in debug mode for autonomous wave system
+      const debugMode = new URL(window.location.href).searchParams.get('demo') === 'debug';
+      if (!debugMode) {
+        waveBtn.style.display = 'none';
+      } else {
+        // Debug mode: clicking starts a wave from a random section
+        waveBtn.addEventListener('click', () => {
+          if (!this.waveManager.isActive()) {
+            const sections = this.gameState.getSections();
+            const randomSection = sections[Math.floor(Math.random() * sections.length)];
+            const wave = this.waveManager.createWave(randomSection.id);
+            this.showIncomingCue(randomSection.id);
+            waveBtn.disabled = true;
+            waveBtn.textContent = 'WAVE IN PROGRESS...';
+          }
+        });
+      }
+    }    // Setup Force Sputter button
     const forceSputter = () => {
       if (!this.waveManager.isActive() && this.gameState.getSessionState() === 'active') {
         this.forceSputterNextSection = true;
@@ -271,13 +281,14 @@ export class StadiumScene extends Phaser.Scene {
       this.updateWaveStrengthMeter(data.strength);
     });
 
-    this.waveManager.on('sectionWave', async (data: { section: string; strength: number }) => {
+    this.waveManager.on('sectionWave', async (data: { section: string; strength: number; direction: 'left' | 'right' }) => {
       const sectionIndex = this.getSectionIndex(data.section);
       const section = this.sections[sectionIndex];
       section.resetFanWaveState();
 
       const forced = this.waveManager.consumeForcedFlags();
       let waveStrength = data.strength;
+      const direction = data.direction || 'right'; // Default to right if not specified
       const cfg = gameBalance.waveClassification;
       const baseRecoveryBonus = gameBalance.waveStrength.recoveryBonus;
       const boosterType = this.waveManager.getLastBoosterType();
@@ -302,7 +313,15 @@ export class StadiumScene extends Phaser.Scene {
       let deathCount = 0;
       let previousColumnState: 'success' | 'sputter' | 'death' = 'success';
 
-      for (let col = 0; col < maxColumns; col++) {
+      // Determine column iteration order based on wave direction
+      const columnOrder = direction === 'left' 
+        ? Array.from({ length: maxColumns }, (_, i) => maxColumns - 1 - i) // Right to left: [7,6,5,4,3,2,1,0]
+        : Array.from({ length: maxColumns }, (_, i) => i); // Left to right: [0,1,2,3,4,5,6,7]
+
+      console.log(`[Wave Animation] Section ${data.section}: animating ${direction} (columns: ${columnOrder.slice(0, 3).join(',')}...)`);
+
+      for (let idx = 0; idx < maxColumns; idx++) {
+        const col = columnOrder[idx];
         const fanStates = section.calculateColumnParticipation(col, waveStrength * participationMultiplier);
         let columnParticipating = 0;
         for (const st of fanStates) {
@@ -335,7 +354,7 @@ export class StadiumScene extends Phaser.Scene {
         let visualState: 'full' | 'sputter' | 'death' = columnState === 'success' ? 'full' : (columnState === 'sputter' ? 'sputter' : 'death');
         await section.playColumnAnimation(col, fanStates, visualState, waveStrength);
 
-        if (col < maxColumns - 1) {
+        if (idx < maxColumns - 1) {
           await new Promise(res => this.time.delayedCall(gameBalance.waveTiming.columnDelay, res));
         }
       }
@@ -389,6 +408,14 @@ export class StadiumScene extends Phaser.Scene {
 
 
   update(time: number, delta: number): void {
+    // Debug: Log once to confirm update is running
+    if (!this.hasLoggedUpdate) {
+      console.log('[StadiumScene] UPDATE LOOP IS RUNNING');
+      console.log('[StadiumScene] waveAutonomous.enabled =', gameBalance.waveAutonomous.enabled);
+      console.log('[StadiumScene] Wave manager active =', this.waveManager.isActive());
+      this.hasLoggedUpdate = true;
+    }
+
     // Update session timer if active
     if (this.gameState.getSessionState() === 'active') {
       this.gameState.updateSession(delta);
@@ -402,7 +429,8 @@ export class StadiumScene extends Phaser.Scene {
     }
 
     // Update fan stats (thirst decay, happiness, attention)
-    if (!this.demoMode) {
+    // Only update stats when session is actually active (not during countdown)
+    if (!this.demoMode && this.gameState.getSessionState() === 'active') {
       this.sections.forEach(section => {
         section.updateFanStats(delta);
       });
@@ -423,6 +451,18 @@ export class StadiumScene extends Phaser.Scene {
 
     // Update vendor manager
     this.vendorManager.update(delta);
+
+    // Check for autonomous wave triggering (only when session is active)
+    if (gameBalance.waveAutonomous.enabled && 
+        !this.waveManager.isActive() && 
+        this.gameState.getSessionState() === 'active') {
+      const triggerSection = this.waveManager.checkWaveProbability();
+      if (triggerSection) {
+        const wave = this.waveManager.createWave(triggerSection);
+        this.showIncomingCue(triggerSection);
+        console.log(`[Autonomous Wave] Started from section ${triggerSection}, Wave ID: ${wave.id}`);
+      }
+    }
 
     // Update wave countdown if active
     if (this.waveManager.isActive()) {
@@ -454,6 +494,30 @@ export class StadiumScene extends Phaser.Scene {
 
     // Update debug panel stats
     this.updateDebugStats();
+  }
+
+  /**
+   * Show incoming wave cue visual
+   * @param sectionId - Section where wave will start
+   */
+  private showIncomingCue(sectionId: string): void {
+    // TODO: Implement visual cue
+    // - Blue blink effect on section sprite
+    // - Countdown text below section (using sectionStatOffsetY from config)
+    // - Duration from gameBalance.waveAutonomous.incomingCueDuration
+    console.log(`[Incoming Cue] Wave starting from section ${sectionId}`);
+  }
+
+  /**
+   * Play wave start particle effect
+   * @param x - X position
+   * @param y - Y position
+   */
+  private playWaveStartEffect(x: number, y: number): void {
+    // TODO: Implement particle spray using Phaser.GameObjects.Particles
+    // - Simple upward spray of particles
+    // - Short duration (1-2 seconds)
+    console.log(`[Particle Effect] Wave start at (${x}, ${y})`);
   }
 
   /**
@@ -552,6 +616,8 @@ export class StadiumScene extends Phaser.Scene {
           this.time.delayedCall(500, () => {
             this.sessionCountdownOverlay?.setVisible(false);
             this.gameState.activateSession();
+            // Set session start time for autonomous wave delay
+            this.waveManager.setSessionStartTime(Date.now());
           });
         }
       },

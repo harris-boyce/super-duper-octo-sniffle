@@ -2,6 +2,8 @@ import type { GameStateManager } from './GameStateManager';
 import type { VendorManager } from './VendorManager';
 import type { SeatManager } from './SeatManager';
 import { gameBalance } from '@/config/gameBalance';
+import { Wave } from './Wave';
+import type { WaveType } from './Wave';
 
 interface WaveCalculationResult {
   sectionId: string;
@@ -42,6 +44,17 @@ export class WaveManager {
   private waveBoosterMultiplier: number; // overall participation multiplier for this wave (temporary)
   private lastTwoColumnParticipation: number[]; // rolling store of last 2 column participation rates
   private columnStateRecords: Array<{ sectionId: string; columnIndex: number; participation: number; state: 'success' | 'sputter' | 'death' }>; // debug/analytics
+
+  // Autonomous wave system properties
+  private lastWaveEndTime: number = 0; // timestamp when last wave completed
+  private lastWaveCooldownDuration: number = 0; // cooldown duration for last wave
+  private lastSectionStartTimes: Map<string, number> = new Map(); // per-section cooldown tracking
+  private activeWave: Wave | null = null; // current wave instance
+  private waveHistory: Wave[] = []; // completed wave instances
+  private maxPossibleScore: number = 0; // cumulative max possible score
+  private nextWaveId: number = 1; // auto-increment wave ID
+  private lastProbabilityCheckLog: number = 0; // throttle logging
+  private sessionStartTime: number = 0; // when session became active (for startup delay)
 
   /**
    * Creates a new WaveManager instance
@@ -202,6 +215,14 @@ export class WaveManager {
     return this.lastBoosterType;
   }
 
+  /**
+   * Set session start time (for autonomous wave startup delay)
+   */
+  public setSessionStartTime(time: number): void {
+    this.sessionStartTime = time;
+    console.log('[WaveManager] Session started, 5s delay before autonomous waves');
+  }
+
   /** Classify a column participation rate */
   public classifyColumn(participation: number): 'success' | 'sputter' | 'death' {
     const cfg = gameBalance.waveClassification;
@@ -236,6 +257,272 @@ export class WaveManager {
   public getLastTwoAvgParticipation(): number {
     if (this.lastTwoColumnParticipation.length === 0) return 0;
     return this.lastTwoColumnParticipation.reduce((a, b) => a + b, 0) / this.lastTwoColumnParticipation.length;
+  }
+
+  /**
+   * Check if the system is in global cooldown
+   * Global cooldown = incoming cue duration + wave travel time + success/failure cooldown
+   * @returns true if in cooldown, false otherwise
+   */
+  public isInGlobalCooldown(): boolean {
+    if (!gameBalance.waveAutonomous.enabled) return true;
+    if (this.lastWaveEndTime === 0) return false;
+
+    const now = Date.now();
+    const elapsed = now - this.lastWaveEndTime;
+    const inCooldown = elapsed < this.lastWaveCooldownDuration;
+    
+    if (inCooldown) {
+      const remaining = this.lastWaveCooldownDuration - elapsed;
+      // Only log occasionally to avoid spam
+      if (Math.floor(remaining / 1000) !== Math.floor((remaining + 16) / 1000)) {
+        console.log(`[Global Cooldown] ${Math.ceil(remaining / 1000)}s remaining`);
+      }
+    }
+    
+    return inCooldown;
+  }
+
+  /**
+   * Check if a specific section can start a wave (per-section cooldown)
+   * @param sectionId - The section to check
+   * @returns true if section can start wave, false if in cooldown
+   */
+  public canSectionStartWave(sectionId: string): boolean {
+    if (!gameBalance.waveAutonomous.enabled) {
+      return false;
+    }
+    
+    const lastStart = this.lastSectionStartTimes.get(sectionId);
+    if (!lastStart) {
+      return true;
+    }
+
+    const now = Date.now();
+    const cooldown = gameBalance.waveAutonomous.sectionStartCooldown;
+    const elapsed = now - lastStart;
+    const canStart = elapsed >= cooldown;
+    return canStart;
+  }
+
+  /**
+   * Record wave end and start global cooldown
+   * @param success - Whether wave completed successfully
+   */
+  public recordWaveEnd(success: boolean): void {
+    const cooldown = success 
+      ? gameBalance.waveAutonomous.successCooldown
+      : gameBalance.waveAutonomous.failureCooldown;
+    
+    this.lastWaveEndTime = Date.now();
+    this.lastWaveCooldownDuration = cooldown;
+    
+    console.log(`[WaveManager] Wave ended (${success ? 'SUCCESS' : 'FAIL'}), cooldown: ${cooldown}ms`);
+    
+    // Emit event with cooldown info
+    this.emit('waveCooldownStarted', { success, cooldown, endsAt: this.lastWaveEndTime + cooldown });
+  }
+
+  /**
+   * Record section start time for per-section cooldown
+   * @param sectionId - The section that initiated the wave
+   */
+  public recordSectionStart(sectionId: string): void {
+    this.lastSectionStartTimes.set(sectionId, Date.now());
+  }
+
+  /**
+   * Check wave probability for all sections and potentially trigger a wave
+   * Sections are checked in random order, weighted by position preference
+   * @returns The section that triggered a wave, or null if no wave triggered
+   */
+  public checkWaveProbability(): string | null {
+    if (!gameBalance.waveAutonomous.enabled) {
+      return null;
+    }
+    if (this.active || this.propagating) {
+      return null;
+    }
+    if (this.isInGlobalCooldown()) {
+      return null;
+    }
+
+    // 5-second startup delay after session begins
+    if (this.sessionStartTime > 0) {
+      const elapsed = Date.now() - this.sessionStartTime;
+      const startupDelay = 5000; // 5 seconds
+      if (elapsed < startupDelay) {
+        return null; // Too early, don't even check
+      }
+    }
+
+    const sections = this.gameState.getSections();
+    const now = Date.now();
+    const shouldLog = (now - this.lastProbabilityCheckLog) > 1000; // Log max once per second
+
+    if (shouldLog) {
+      console.log('[Wave Probability] === CHECK START ===');
+      this.lastProbabilityCheckLog = now;
+    }
+
+    // Create weighted section order
+    // Build array of sections with their position weights
+    const weightedSections = sections.map((section, i) => ({
+      section,
+      index: i,
+      weight: Wave.getSectionPositionWeight(
+        i,
+        sections.length,
+        gameBalance.waveAutonomous.sectionPositionWeights
+      )
+    }));
+
+    // Sort by weight (descending) with random tiebreaker
+    // This makes edges (higher weight) more likely to be checked first
+    weightedSections.sort((a, b) => {
+      if (Math.abs(a.weight - b.weight) < 0.01) {
+        // Equal weights - randomize order
+        return Math.random() - 0.5;
+      }
+      return b.weight - a.weight; // Higher weight first
+    });
+
+    if (shouldLog) {
+      console.log(`  Check order: ${weightedSections.map(ws => ws.section.id).join(' → ')}`);
+    }
+
+    // Check each section in weighted random order
+    for (const { section, index } of weightedSections) {
+      // Check per-section cooldown - skip if on cooldown
+      const canStart = this.canSectionStartWave(section.id);
+      if (!canStart) {
+        if (shouldLog) console.log(`  ${section.id}: IN COOLDOWN (skipping)`);
+        continue;
+      }
+
+      // Get section average happiness
+      const avgHappiness = this.gameState.getSectionAverageHappiness(section.id);
+      
+      // Three probability bands based on happiness:
+      // Low (<20%): 40% chance
+      // Medium (20-60%): 60% chance
+      // High (>60%): 90% chance
+      let baseProbability: number;
+      if (avgHappiness < 20) {
+        baseProbability = 0.40;
+      } else if (avgHappiness < 60) {
+        baseProbability = 0.60;
+      } else {
+        baseProbability = 0.90;
+      }
+
+      // Roll for wave trigger
+      const roll = Math.random();
+
+      if (shouldLog) {
+        const band = baseProbability === 0.40 ? 'LOW' : baseProbability === 0.60 ? 'MED' : 'HIGH';
+        console.log(`  ${section.id}: happiness=${avgHappiness.toFixed(1)}, band=${band} (${(baseProbability * 100).toFixed(0)}%), roll=${(roll * 100).toFixed(1)}%`);
+      }
+
+      // Check if this section triggers a wave
+      if (roll < baseProbability) {
+        console.log(`[Wave Probability] ${section.id}: WAVE TRIGGERED! 🌊`);
+        return section.id;
+      }
+    }
+
+    if (shouldLog) console.log('[Wave Probability] No trigger');
+    return null;
+  }
+
+  /**
+   * Create a new Wave instance and start wave propagation
+   * @param originSectionId - The section where wave starts
+   * @param type - Wave type (normal, super, double_down)
+   * @returns The created Wave instance
+   */
+  public createWave(originSectionId: string, type: WaveType = 'NORMAL'): Wave {
+    const sections = this.gameState.getSections();
+    const allSectionIds = sections.map(s => s.id);
+    
+    // Calculate the wave path from origin section
+    const wavePath = Wave.calculatePath(allSectionIds, originSectionId);
+    
+    const wave = new Wave(
+      this.nextWaveId.toString(),
+      type,
+      originSectionId,
+      wavePath,
+      Date.now()
+    );
+
+    this.nextWaveId++; // Increment for next wave
+    this.activeWave = wave;
+    this.recordSectionStart(originSectionId);
+
+    // Emit event for visuals (incoming cue)
+    this.emit('waveCreated', { wave: wave.toJSON() });
+
+    // Actually start the wave propagation!
+    this.startWave();
+    console.log(`[WaveManager] Wave ${wave.id} created from ${originSectionId}, path: ${wavePath.join('→')}`);
+
+    return wave;
+  }
+
+  /**
+   * Finalize current wave and move to history
+   * @param success - Whether wave completed successfully
+   */
+  public finalizeWave(success: boolean): void {
+    if (!this.activeWave) return;
+
+    this.activeWave.complete(Date.now());
+    this.waveHistory.push(this.activeWave);
+
+    // Update max possible score
+    this.maxPossibleScore += this.activeWave.getMaxPossibleScore();
+
+    // Record cooldown
+    this.recordWaveEnd(success);
+
+    // Emit event
+    this.emit('waveFinalized', { wave: this.activeWave.toJSON(), success });
+
+    this.activeWave = null;
+  }
+
+  /**
+   * Get current active wave
+   */
+  public getActiveWave(): Wave | null {
+    return this.activeWave;
+  }
+
+  /**
+   * Get wave history
+   */
+  public getWaveHistory(): Wave[] {
+    return [...this.waveHistory];
+  }
+
+  /**
+   * Get max possible score (for normalized scoring)
+   */
+  public getMaxPossibleScore(): number {
+    return this.maxPossibleScore;
+  }
+
+  /**
+   * Export all waves as JSON for debugging
+   */
+  public exportWavesJSON(): string {
+    const data = {
+      activeWave: this.activeWave?.toJSON() || null,
+      history: this.waveHistory.map(w => w.toJSON()),
+      maxPossibleScore: this.maxPossibleScore,
+    };
+    return JSON.stringify(data, null, 2);
   }
 
   /** Enhanced recovery check: sputter -> clean success triggers amplified bonus before next column */
@@ -411,13 +698,25 @@ export class WaveManager {
 
   /**
    * Starts a new wave
-   * Sets the wave to active, resets countdown and current section
+   * Sets the wave to active, resets countdown
+   * For autonomous waves, uses the Wave instance's path
    * Emits 'waveStart' event
    */
   public startWave(): void {
     this.active = true;
     this.countdown = gameBalance.waveTiming.triggerCountdown / 1000; // Convert ms to seconds
-    this.currentSection = 0;
+    
+    // If we have an active Wave instance, start from its origin section index
+    // Otherwise default to section 0 (for manual/debug waves)
+    if (this.activeWave) {
+      const sections = this.gameState.getSections();
+      const originIndex = sections.findIndex(s => s.id === this.activeWave!.originSection);
+      this.currentSection = originIndex >= 0 ? originIndex : 0;
+      console.log(`[WaveManager] Starting wave from section ${this.activeWave.originSection} (index ${this.currentSection})`);
+    } else {
+      this.currentSection = 0;
+    }
+    
     this.currentWaveStrength = gameBalance.waveStrength.starting;
     this.waveCalculationResults = [];
     this.consecutiveFailedColumns = 0;
@@ -442,10 +741,10 @@ export class WaveManager {
 
   /**
    * Propagates the wave through sections sequentially
+   * Uses the Wave instance's calculated path for direction
    * Each section is processed with a 1-second delay
    * Stops propagation if any section fails
    * Emits events for each section and completion
-   * TODO: Populate waveCalculationResults during propagation for visual momentum animation
    */
   public async propagateWave(): Promise<void> {
     // Prevent re-entrant propagation (avoid duplicate scoring/events)
@@ -454,7 +753,11 @@ export class WaveManager {
 
     this.waveResults = [];
     this.waveCalculationResults = [];
-    const sections = ['A', 'B', 'C'];
+    
+    // Use Wave instance path if available, otherwise default to A→B→C
+    const sections = this.activeWave ? this.activeWave.path : ['A', 'B', 'C'];
+    console.log(`[WaveManager] Propagating wave along path: ${sections.join('→')}`);
+    
     let hasFailedOnce = false;
 
     for (let i = 0; i < sections.length; i++) {
@@ -470,7 +773,8 @@ export class WaveManager {
       // 5. Emit visual animations based on state
       await this.emitAsync('sectionWave', {
         section: sectionId,
-        strength: this.getCurrentWaveStrength()
+        strength: this.getCurrentWaveStrength(),
+        direction: this.activeWave ? this.activeWave.direction : 'right'
       });
 
       // Get the state that the scene determined and recorded
@@ -498,7 +802,17 @@ export class WaveManager {
       }
     }
 
-    // Wave complete
+    // Wave complete - determine success and record cooldown
+    const waveSuccess = !hasFailedOnce;
+    
+    // Finalize the Wave instance if we have one
+    if (this.activeWave) {
+      this.finalizeWave(waveSuccess);
+    } else {
+      // Manual wave without Wave instance - just record cooldown
+      this.recordWaveEnd(waveSuccess);
+    }
+    
     this.emit('waveComplete', { results: this.waveResults });
     this.active = false;
     this.propagating = false;

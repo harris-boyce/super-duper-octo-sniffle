@@ -241,10 +241,16 @@ export class Fan extends Phaser.GameObjects.Container {
     }
 
     return new Promise((resolve) => {
+      // Kill any existing tweens on this fan to prevent conflicts
+      this.scene.tweens.killTweensOf(this);
+      
+      // Store the original Y position to ensure we return to correct spot
+      const targetY = originalY;
+      
       // Up tween (gradual rise with peak behind leading edge)
       this.scene.tweens.add({
         targets: this,
-        y: originalY + jumpHeight,
+        y: targetY + jumpHeight,
         duration: upDuration,
         ease: upEase,
         delay: delayMs,
@@ -252,10 +258,12 @@ export class Fan extends Phaser.GameObjects.Container {
           // Down tween (smooth return)
           this.scene.tweens.add({
             targets: this,
-            y: originalY,
+            y: targetY,
             duration: downDuration,
             ease: downEase,
             onComplete: () => {
+              // Ensure we're exactly at the target position
+              this.y = targetY;
               resolve();
             }
           });

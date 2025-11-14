@@ -83,10 +83,66 @@ export const gameBalance = {
   },
 
   /**
+   * Autonomous wave triggering system configuration
+   * Controls how the crowd initiates waves based on section happiness
+   */
+  waveAutonomous: {
+    // Master toggle for autonomous wave system
+    enabled: true,
+
+    // Triggering thresholds
+    waveStartHappinessThreshold: 0.60, // section avg happiness (0-100) must be >= this (60%) to trigger wave
+    
+    // Cooldown durations (milliseconds)
+    successCooldown: 5000, // 5 seconds after successful wave completes
+    failureCooldown: 9000, // 9 seconds after failed wave (5s base + 4s penalty)
+    sectionStartCooldown: 8000, // 8 seconds before same section can initiate another wave
+    
+    // Happiness decay configuration (replaces linear decay)
+    thirstHappinessDecayThreshold: 50, // happiness only decays when thirst > this value
+    thirstHappinessDecayRate: 1.0, // happiness decay rate (points per second) when thirsty
+    
+    // Peer pressure mechanics (section aggregate behavior)
+    peerPressureHappinessThreshold: 75, // section avg happiness must be >= this for peer pressure boost
+    peerPressureAttentionBoost: 0.5, // attention boost (points per second) for all fans in section
+    
+    // Wave completion rewards
+    waveCompletionHappinessBoost: 15, // temporary happiness boost when wave completes successfully
+    waveCompletionAttentionBoost: 20, // temporary attention boost when wave completes successfully
+    waveBoostDuration: 5000, // duration (ms) of temporary boosts
+    
+    // Section position weights (edge sections more likely to start waves)
+    // Keys represent total section count, values are arrays of weights by position
+    sectionPositionWeights: {
+      3: [1.5, 0.5, 1.5], // edges favored, center suppressed
+      4: [1.3, 1.0, 1.0, 1.3], // edges slightly favored
+      5: [1.5, 1.2, 0.5, 1.2, 1.5], // edges favored, center suppressed
+    },
+    
+    // Visual configuration
+    incomingCueDuration: 3000, // duration (ms) of incoming wave cue animation
+    sectionStatOffsetY: 20, // vertical offset (px) for section stat overlays below section sprites
+    
+    // Special wave types (currently stubbed for future implementation)
+    specialWaveTypes: {
+      SUPER: {
+        enabled: false, // disabled until implemented
+        speedMultiplier: 2.0, // waves travel twice as fast
+        scoreMultiplier: 1.5, // 50% bonus points
+      },
+      DOUBLE_DOWN: {
+        enabled: false, // disabled until implemented
+        reverseAfterComplete: true, // wave reverses direction after completing
+        scoreMultiplier: 2.0, // double points
+      },
+    },
+  },
+
+  /**
    * Wave timing configuration (all in milliseconds, converted to seconds where needed)
    */
   waveTiming: {
-    triggerCountdown: 3000, // 3 seconds before wave fires
+    triggerCountdown: 10000, // 10 seconds before wave fires
     baseCooldown: 10000, // 10 seconds between waves
     successRefund: 5000, // refund this much if all sections succeed
     columnDelay: 44, // ms between column animations
