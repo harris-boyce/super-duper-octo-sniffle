@@ -292,7 +292,7 @@ export class GameStateManager {
     }
 
     // Calculate final score
-    const maxPossibleScore = gameBalance.scoring.basePointsPerWave * 10; // assume 10 waves max
+    const maxPossibleScore = gameBalance.scoring.basePointsPerWave * maxPossibleWaves; // use consistent max waves
     const finalScore = Math.round(this.completedWaves * gameBalance.scoring.basePointsPerWave);
     const scorePercentage = finalScore / maxPossibleScore;
 
