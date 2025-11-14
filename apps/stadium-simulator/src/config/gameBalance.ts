@@ -225,6 +225,136 @@ export const gameBalance = {
     countdownFontSize: 120,
     waveCountdownFontSize: 48,
   },
+
+  /**
+   * Vendor movement and pathfinding configuration
+   */
+  vendorMovement: {
+    // Base movement speeds (pixels per second)
+    baseSpeedCorridor: 100, // fastest - no obstacles
+    baseSpeedStair: 80, // moderate - vertical movement
+    baseSpeedRow: 50, // slowest - navigating through seated fans
+    
+    // Terrain penalties (0-1 multipliers reducing speed)
+    rowBasePenalty: 0.10, // 10% slowdown when moving through any row
+    occupiedSeatPenalty: 0.20, // additional 20% slowdown per occupied seat
+    emptySeatPenalty: 0, // no penalty for empty seats
+    grumpPenaltyMultiplier: 2.0, // multiply base penalty by this for grumps
+    maxTerrainPenalty: 0.90, // cap total penalty at 90% slowdown
+    
+    // Pathfinding parameters
+    detourToleranceBase: 0.25, // penalty threshold to trigger local detour search
+    pathRecalcInterval: 2000, // ms between path recalculations for dynamic updates
+  },
+
+  /**
+   * Grump/difficult terrain configuration
+   * Foundation for future grump fan type
+   */
+  grumpConfig: {
+    // Thresholds for difficult terrain classification
+    unhappyThreshold: 40, // happiness below this triggers difficult terrain
+    disappointmentThreshold: 50, // disappointment above this triggers difficult terrain
+    
+    // Grump-specific stat growth (disabled until grump type implemented)
+    disgruntlementGrowthRate: 0, // points per second (grump-only)
+    disappointmentGrowthRate: 0, // points per second when thirsty + unhappy
+    
+    // Movement penalty application
+    applyToAllFans: false, // if true, all fans can be difficult terrain; if false, grump-only
+  },
+
+  /**
+   * Vendor quality tier configuration
+   * Affects pathfinding efficiency, distraction likelihood, and penalty tolerance
+   */
+  vendorQuality: {
+    excellent: {
+      efficiencyModifier: 1.3, // 30% faster pathfinding/movement
+      distractionChance: 0, // never gets distracted
+      penaltyTolerance: 0.35, // higher tolerance before detour
+    },
+    good: {
+      efficiencyModifier: 1.0, // baseline performance
+      distractionChance: 0.05, // 5% chance per check
+      penaltyTolerance: 0.25, // standard tolerance
+    },
+    average: {
+      efficiencyModifier: 0.8, // 20% slower
+      distractionChance: 0.15, // 15% chance per check
+      penaltyTolerance: 0.20, // lower tolerance
+    },
+    poor: {
+      efficiencyModifier: 0.6, // 40% slower
+      distractionChance: 0.30, // 30% chance per check
+      penaltyTolerance: 0.15, // easily triggered detours
+    },
+    
+    // Distraction behavior
+    distractionDuration: 1500, // ms vendor pauses when distracted
+    distractionCheckInterval: 3000, // ms between distraction rolls
+  },
+
+  /**
+   * Vendor type configurations
+   */
+  vendorTypes: {
+    // Drink vendor (in-section service)
+    drink: {
+      serviceTime: 2000, // ms to serve one fan
+      thirstReductionAmount: 100, // full thirst reset
+      happinessBoost: 15, // points added to happiness
+      canEnterRows: true, // allowed to navigate section rows
+      rangedOnly: false, // must approach fans directly
+    },
+    
+    // Ranged AoE vendor (t-shirt cannon, front-only service)
+    rangedAoE: {
+      // AoE mechanics
+      baseRadius: 30, // pixels - default AoE radius
+      centerHappinessBoost: 30, // happiness boost at epicenter
+      falloffPerRing: 5, // happiness reduction per distance ring
+      
+      // Attention mechanics
+      attentionReductionRate: 2.0, // points per second while in range
+      attentionReductionCap: 0.5, // max rate when stacked with other effects
+      attentionRecoveryDelay: 3000, // ms delay before recovery starts
+      attentionRecoveryRate: 1.5, // points per second during recovery
+      
+      // Targeting
+      targetUnhappyThreshold: 60, // prioritize fans below this happiness
+      excludeDifficultTerrain: true, // don't target grumps
+      
+      // Timing
+      chargeDuration: 1500, // ms to charge before firing
+      cooldownDuration: 4000, // ms between shots
+      
+      // Movement restrictions
+      canEnterRows: false, // stays in front corridor
+      rangedOnly: true, // fires from distance
+    },
+  },
+
+  /**
+   * Session default vendor spawning
+   */
+  sessionDefaults: {
+    initialVendorCount: 2, // start with 2 vendors
+    initialVendorType: 'drink' as const, // both are drink vendors
+    initialVendorQuality: 'good' as const, // good quality tier
+  },
+
+  /**
+   * Vendor debug configuration
+   */
+  vendorDebug: {
+    enabled: false, // toggle debug logging and overlays
+    logPathPlanning: true, // log path calculation details
+    logTargetSelection: true, // log target scoring
+    logMovement: false, // log movement updates (verbose)
+    renderPaths: true, // draw debug lines for paths
+    renderAoE: true, // draw AoE radius circles
+  },
 };
 
 export type GameBalance = typeof gameBalance;

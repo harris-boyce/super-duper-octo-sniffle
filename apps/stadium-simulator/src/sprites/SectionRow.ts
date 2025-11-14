@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
 import { Seat } from './Seat';
+import type { VendorAbilities } from '@/types/GameTypes';
+import { gameBalance } from '@/config/gameBalance';
 
 /**
  * Represents a row in a stadium section
@@ -114,6 +116,30 @@ export class SectionRow {
   getOccupancyRate(): number {
     const occupied = this.seats.filter(seat => !seat.isEmpty()).length;
     return occupied / this.seatCount;
+  }
+
+  /**
+   * Calculate row traversal cost for vendor pathfinding
+   * Aggregates seat penalties across the row and adds base row penalty
+   * 
+   * @param vendorAbilities Vendor abilities to check for penalty overrides
+   * @returns Total movement cost penalty for traversing this row
+   */
+  public getRowTraversalCost(vendorAbilities: VendorAbilities): number {
+    let totalPenalty = 0;
+
+    // Add base row penalty unless vendor ignores it
+    if (!vendorAbilities.ignoreRowPenalty) {
+      totalPenalty += gameBalance.vendorMovement.rowBasePenalty;
+    }
+
+    // Aggregate seat penalties
+    for (const seat of this.seats) {
+      totalPenalty += seat.getTraversalPenalty(vendorAbilities);
+    }
+
+    // Cap at maximum terrain penalty
+    return Math.min(totalPenalty, gameBalance.vendorMovement.maxTerrainPenalty);
   }
 
   /** Converts HSL color values to Phaser hex format */

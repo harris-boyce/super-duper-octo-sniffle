@@ -23,6 +23,10 @@ export class Fan extends Phaser.GameObjects.Container {
   private thirst: number;
   private attention: number;
 
+  // Grump/difficult terrain stats (foundation for future grump type)
+  private disgruntlement: number = 0; // only grows for future grump type
+  private disappointment: number = 0; // dynamic accumulator for unhappiness condition
+
   public _lastWaveParticipated: boolean = false;
 
   // Wave participation properties
@@ -377,6 +381,19 @@ export class Fan extends Phaser.GameObjects.Container {
     if (this.thirst > 50) {
       this.happiness = Math.max(0, this.happiness - deltaSeconds * gameBalance.fanStats.happinessDecayRate);
     }
+
+    // Disappointment accumulation (future grump-only feature)
+    // Only accumulates when thirst > 50 AND happiness is actively decaying
+    // Currently disabled via grumpConfig.disappointmentGrowthRate = 0
+    if (this.thirst > 50 && this.happiness < gameBalance.grumpConfig.unhappyThreshold) {
+      this.disappointment = Math.min(
+        100,
+        this.disappointment + deltaSeconds * gameBalance.grumpConfig.disappointmentGrowthRate
+      );
+    } else {
+      // Gradually reduce disappointment when conditions improve
+      this.disappointment = Math.max(0, this.disappointment - deltaSeconds * 0.5);
+    }
   }
 
   /**
@@ -419,5 +436,47 @@ export class Fan extends Phaser.GameObjects.Container {
     const result = Math.random() * 100 < chance;
     this._lastWaveParticipated = result;
     return result;
+  }
+
+  // === Grump/Difficult Terrain Methods (Foundation) ===
+
+  /**
+   * Check if this fan qualifies as difficult terrain for vendor pathfinding
+   * Based on happiness threshold or disappointment threshold
+   * @returns true if fan is difficult terrain, false otherwise
+   */
+  public isDifficultTerrain(): boolean {
+    return (
+      this.happiness < gameBalance.grumpConfig.unhappyThreshold ||
+      this.disappointment > gameBalance.grumpConfig.disappointmentThreshold
+    );
+  }
+
+  /**
+   * Get the terrain penalty multiplier for this fan
+   * Used by vendor pathfinding to calculate movement penalties
+   * @returns Penalty multiplier (1.0 for normal, higher for difficult terrain)
+   */
+  public getTerrainPenaltyMultiplier(): number {
+    if (this.isDifficultTerrain()) {
+      return gameBalance.vendorMovement.grumpPenaltyMultiplier;
+    }
+    return 1.0;
+  }
+
+  /**
+   * Get disgruntlement level (future grump-only stat)
+   * @returns Current disgruntlement value
+   */
+  public getDisgruntlement(): number {
+    return this.disgruntlement;
+  }
+
+  /**
+   * Get disappointment level (dynamic unhappiness accumulator)
+   * @returns Current disappointment value
+   */
+  public getDisappointment(): number {
+    return this.disappointment;
   }
 }
