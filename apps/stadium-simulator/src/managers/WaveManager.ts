@@ -149,6 +149,7 @@ export class WaveManager {
    * Update wave strength based on column participation rate
    * @param participationRate - Participation rate for the column (0-1)
    * @param wasFailureRecovery - Whether this column succeeded after previous failures
+   * TODO: Integrate into wave propagation to track momentum during visual animation
    */
   private updateWaveStrength(participationRate: number, wasFailureRecovery: boolean = false): void {
     const config = gameBalance.waveStrength;
@@ -175,6 +176,7 @@ export class WaveManager {
 
   /**
    * Check if wave is dead (strength too low or too many consecutive failures)
+   * TODO: Use this during wave propagation to determine visual animation state
    */
   private isWaveDead(): boolean {
     const config = gameBalance.waveStrength;
@@ -186,6 +188,7 @@ export class WaveManager {
 
   /**
    * Determine visual state of column animation based on wave state
+   * TODO: Implement visual states ('full' vs 'sputter' vs 'death') during column animation playback
    */
   private getColumnVisualState(isSputtering: boolean = false): 'full' | 'sputter' | 'death' {
     if (this.isWaveDead()) {
@@ -245,6 +248,7 @@ export class WaveManager {
    * Each section is processed with a 1-second delay
    * Stops propagation if any section fails
    * Emits events for each section and completion
+   * TODO: Populate waveCalculationResults during propagation for visual momentum animation
    */
   public async propagateWave(): Promise<void> {
     // Prevent re-entrant propagation (avoid duplicate scoring/events)

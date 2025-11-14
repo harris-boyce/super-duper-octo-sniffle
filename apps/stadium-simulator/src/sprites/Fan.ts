@@ -28,6 +28,7 @@ export class Fan extends Phaser.GameObjects.Container {
   // Wave participation properties
   private waveStrengthModifier: number = 0;
   private attentionFreezeUntil: number = 0;
+  private thirstFreezeUntil: number = 0;
   public reducedEffort: boolean = false;
 
   constructor(scene: Phaser.Scene, x: number, y: number, size = 28) {
@@ -281,17 +282,20 @@ export class Fan extends Phaser.GameObjects.Container {
     this.thirst = 0;
     this.happiness = Math.min(100, this.happiness + 15);
     // Freeze thirst growth for a short duration
-    this.attentionFreezeUntil = this.scene.time.now + gameBalance.fanStats.thirstFreezeDuration;
+    this.thirstFreezeUntil = this.scene.time.now + gameBalance.fanStats.thirstFreezeDuration;
   }
 
   /**
    * Fan successfully participates in a wave
    * Resets attention and freezes attention decay temporarily
+   * Also resets reducedEffort flag to clean up peer-pressure state
    */
   public onWaveParticipation(success: boolean): void {
     if (success) {
       this.attention = 100;
       this.attentionFreezeUntil = this.scene.time.now + gameBalance.fanStats.attentionFreezeDuration;
+      // Reset reduced effort flag after wave participation
+      this.reducedEffort = false;
     }
   }
 
@@ -313,9 +317,9 @@ export class Fan extends Phaser.GameObjects.Container {
       );
     }
 
-    // Thirst freeze logic
-    if (this.attentionFreezeUntil && this.scene.time.now < this.attentionFreezeUntil) {
-      // Do not increase thirst while frozen (reusing attention freeze for thirst)
+    // Thirst freeze logic (separate timer from attention freeze)
+    if (this.thirstFreezeUntil && this.scene.time.now < this.thirstFreezeUntil) {
+      // Do not increase thirst while frozen
     } else {
       // Fans get thirstier over time (configurable)
       this.thirst = Math.min(100, this.thirst + deltaSeconds * gameBalance.fanStats.thirstGrowthRate);

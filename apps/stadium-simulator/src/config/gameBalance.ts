@@ -117,18 +117,21 @@ export const gameBalance = {
     // Points awarded for various achievements
     basePointsPerWave: 100,
     participationBonus: 10, // per percentage point of participation
+    // Estimated max waves based on session duration and wave timing
+    // Calculated as: Math.ceil(runModeDuration / (baseCooldown + triggerCountdown))
+    maxWavesEstimate: 8, // ~100s session / ~12.5s per wave cycle
   },
 
   /**
    * UI configuration
    */
   ui: {
-    // Wave strength meter
-    meterWidth: 40,
-    meterHeight: 250,
-    meterPanelWidth: 100,
-    meterPanelHeight: 300,
-    meterCornerRadius: 8,
+    // Wave strength meter (used in StadiumScene for creating/updating meter display)
+    meterWidth: 24,
+    meterHeight: 60,
+    meterPanelWidth: 30,
+    meterPanelHeight: 66,
+    meterCornerRadius: 4,
     // Countdown display
     countdownFontSize: 120,
     waveCountdownFontSize: 48,

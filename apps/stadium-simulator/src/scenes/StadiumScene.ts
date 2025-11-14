@@ -259,7 +259,6 @@ export class StadiumScene extends Phaser.Scene {
 
       // Increment success streak
       this.successStreak++;
-      this.gameState.incrementSectionSuccesses();
 
       // Play the visual wave with individual fan participation tracking
       const result = await section.playWave();
@@ -497,10 +496,10 @@ export class StadiumScene extends Phaser.Scene {
    */
   private createWaveStrengthMeter(): void {
     const padding = 20;
-    const meterWidth = 24;
-    const meterHeight = 60;
-    const panelWidth = Math.ceil(meterWidth * 1.25); // 25% wider
-    const panelHeight = Math.ceil(meterHeight * 1.1); // 10% taller
+    const meterWidth = gameBalance.ui.meterWidth;
+    const meterHeight = gameBalance.ui.meterHeight;
+    const panelWidth = gameBalance.ui.meterPanelWidth;
+    const panelHeight = gameBalance.ui.meterPanelHeight;
 
     const meterX = padding + panelWidth / 2;
     const meterY = this.cameras.main.height - padding - panelHeight / 2;
@@ -568,8 +567,8 @@ export class StadiumScene extends Phaser.Scene {
    */
   private addWaveFoamEffect(): void {
     const foamColors = [0xffffff, 0xccddff]; // White and light blue
-    const meterWidth = 24;
-    const meterHeight = 60;
+    const meterWidth = gameBalance.ui.meterWidth;
+    const meterHeight = gameBalance.ui.meterHeight;
     const foamDensity = 0.15; // 15% of pixels are foam
 
     for (let y = -meterHeight / 2; y < meterHeight / 2; y += 2) {
@@ -596,7 +595,7 @@ export class StadiumScene extends Phaser.Scene {
     const strengthText = this.waveStrengthMeter.getByName('strength-value') as Phaser.GameObjects.Text;
 
     if (meterFill && strengthText) {
-      const meterHeight = 60;
+      const meterHeight = gameBalance.ui.meterHeight;
       const fillHeight = (strength / 100) * meterHeight;
       const newY = meterHeight / 2 - (meterHeight - fillHeight) / 2;
 

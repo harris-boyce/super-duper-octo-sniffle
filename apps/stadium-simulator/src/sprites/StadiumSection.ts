@@ -169,6 +169,18 @@ export class StadiumSection extends Phaser.GameObjects.Container {
   }
 
   /**
+   * Resets wave-related state on all fans before new wave calculations
+   * Clears reducedEffort flag and wave strength modifier for clean state
+   */
+  public resetFanWaveState(): void {
+    const allFans = this.getFans();
+    for (const fan of allFans) {
+      fan.reducedEffort = false;
+      fan.setWaveStrengthModifier(0);
+    }
+  }
+
+  /**
    * Calculate participation for a specific column with peer pressure logic
    * @param columnIndex - The column index (0-7)
    * @param waveStrength - Current wave strength for strength modifier
@@ -265,8 +277,10 @@ export class StadiumSection extends Phaser.GameObjects.Container {
       }
     }
 
-    // Start all fans in this column
-    Promise.all(columnPromises); // Don't await - let them run
+    // Start all fans in this column (don't await - allows smooth overlapping animations)
+    Promise.all(columnPromises).catch(err => {
+      console.error('Error during column animation:', err);
+    });
   }
 
   /**
@@ -274,6 +288,9 @@ export class StadiumSection extends Phaser.GameObjects.Container {
    * Now tracks individual fan participation (kept for backwards compatibility)
    */
   public async playWave(): Promise<{ participatingFans: number; totalFans: number; participationRate: number }> {
+    // Reset fan wave state for clean participation calculations
+    this.resetFanWaveState();
+
     const baseColumnDelay = gameBalance.waveTiming.columnDelay;
     const baseRowDelay = gameBalance.waveTiming.rowDelay;
     const columnDelay = baseColumnDelay;
@@ -325,8 +342,10 @@ export class StadiumSection extends Phaser.GameObjects.Container {
         }
       }
 
-      // Start all fans in this column, then delay before next column
-      Promise.all(columnPromises); // Don't await - let them run
+      // Start all fans in this column (don't await - allows smooth overlapping animations)
+      Promise.all(columnPromises).catch(err => {
+        console.error('Error during wave animation:', err);
+      });
       
       // Delay before next column
       if (col < maxSeats - 1) {

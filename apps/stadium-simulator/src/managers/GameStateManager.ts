@@ -277,13 +277,14 @@ export class GameStateManager {
     } else if (this.completedWaves >= waveThresholds['S-']) {
       grade = 'S-';
     } else {
-      // Fall back to percentage-based grading
-      // Estimate max possible waves: with 100s session and ~10s per wave cycle
-      const maxPossibleWaves = Math.max(15, Math.ceil(this.gameMode === 'run' ? 100 / 10 : 15));
+      // Fall back to percentage-based grading using dynamic max waves estimate
+      const maxPossibleWaves = gameBalance.scoring.maxWavesEstimate;
       const percentage = this.completedWaves / maxPossibleWaves;
 
+      // Sort thresholds in descending order to ensure deterministic grade assignment
       const percentThresholds = gameBalance.scoring.percentageThresholds;
-      for (const [gradeKey, threshold] of Object.entries(percentThresholds)) {
+      const sortedThresholds = Object.entries(percentThresholds).sort((a, b) => b[1] - a[1]);
+      for (const [gradeKey, threshold] of sortedThresholds) {
         if (percentage >= threshold) {
           grade = gradeKey;
           break;
@@ -291,8 +292,8 @@ export class GameStateManager {
       }
     }
 
-    // Calculate final score
-    const maxPossibleScore = gameBalance.scoring.basePointsPerWave * 10; // assume 10 waves max
+    // Calculate final score using dynamic max waves estimate
+    const maxPossibleScore = gameBalance.scoring.basePointsPerWave * gameBalance.scoring.maxWavesEstimate;
     const finalScore = Math.round(this.completedWaves * gameBalance.scoring.basePointsPerWave);
     const scorePercentage = finalScore / maxPossibleScore;
 
