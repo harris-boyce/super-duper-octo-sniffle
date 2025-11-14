@@ -104,23 +104,142 @@ export class StadiumSection extends Phaser.GameObjects.Container {
   }
 
   /**
-   * Updates intensity for all fans in this section
+   * Calculate aggregate stats from all fans in this section
    */
-  public updateFanIntensity(intensity: number): void {
-    this.rows.forEach(row => row.updateFanIntensity(intensity));
+  public getAggregateStats(): { happiness: number; thirst: number; attention: number } {
+    const allFans = this.getFans();
+    if (allFans.length === 0) {
+      return { happiness: 50, thirst: 50, attention: 50 };
+    }
+
+    let totalHappiness = 0;
+    let totalThirst = 0;
+    let totalAttention = 0;
+
+    for (const fan of allFans) {
+      const stats = fan.getStats();
+      totalHappiness += stats.happiness;
+      totalThirst += stats.thirst;
+      totalAttention += stats.attention;
+    }
+
+    return {
+      happiness: totalHappiness / allFans.length,
+      thirst: totalThirst / allFans.length,
+      attention: totalAttention / allFans.length
+    };
+  }
+
+  /**
+   * Calculate section bonus for individual fan wave participation
+   * Higher happiness and attention, lower thirst = higher bonus
+   */
+  public getSectionWaveBonus(): number {
+    const aggregate = this.getAggregateStats();
+    // Section bonus is 20% of aggregate happiness + attention, minus 15% of thirst
+    return (aggregate.happiness * 0.2 + aggregate.attention * 0.2) - (aggregate.thirst * 0.15);
+  }
+
+  /**
+   * Update all fan stats (thirst, happiness, attention decay)
+   */
+  public updateFanStats(deltaTime: number): void {
+    const allFans = this.getFans();
+    for (const fan of allFans) {
+      fan.updateStats(deltaTime);
+    }
+  }
+
+  /**
+   * Updates intensity for all fans in this section
+   * Now uses personal thirst if no intensity provided
+   */
+  public updateFanIntensity(intensity?: number): void {
+    if (intensity !== undefined) {
+      this.rows.forEach(row => row.updateFanIntensity(intensity));
+    } else {
+      // Update each fan based on their personal thirst
+      const allFans = this.getFans();
+      for (const fan of allFans) {
+        fan.setIntensity();
+      }
+    }
   }
 
   /**
    * Plays wave animation for all fans with column-based stagger
+   * Now tracks individual fan participation
    */
-  public playWave(): Promise<void> {
-    const columnDelay = 45;
-    const rowDelay = 10;
-    const promises: Promise<void>[] = [];
-    this.rows.forEach(row => {
-      promises.push(row.playWave(columnDelay, rowDelay));
+  public async playWave(): Promise<{ participatingFans: number; totalFans: number; participationRate: number }> {
+    const baseColumnDelay = 22; // slightly slower start (≈20% slower than before)
+    const baseRowDelay = 6; // match column pacing for smoother ascent/descent
+    const columnDelay = baseColumnDelay;
+    const rowDelay = baseRowDelay;
+
+    const sectionBonus = this.getSectionWaveBonus();
+    let participatingFans = 0;
+    let totalFans = 0;
+
+    // PRE-CALCULATE participation for all fans before any animation
+    const rows = this.getRows();
+    const maxSeats = rows[0]?.getSeats().length ?? 0;
+    
+    for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
+      const row = rows[rowIdx];
+      const seats = row.getSeats();
+      for (let col = 0; col < seats.length; col++) {
+        const seat = seats[col];
+        if (!seat.isEmpty()) {
+          const fan = seat.getFan();
+          if (fan) {
+            totalFans++;
+            // Pre-roll participation
+            if (fan.rollForWaveParticipation(sectionBonus)) {
+              participatingFans++;
+            }
+          }
+        }
+      }
+    }
+
+    // Now animate the wave smoothly, column by column
+    for (let col = 0; col < maxSeats; col++) {
+      const columnPromises: Promise<void>[] = [];
+
+      // For each row, animate the seat at this column if they're participating
+      for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
+        const row = rows[rowIdx];
+        const seats = row.getSeats();
+        if (col < seats.length) {
+          const seat = seats[col];
+          if (!seat.isEmpty()) {
+            const fan = seat.getFan();
+            if (fan && fan._lastWaveParticipated) {
+              const delayMs = rowIdx * rowDelay;
+              columnPromises.push(fan.playWave(delayMs));
+            }
+          }
+        }
+      }
+
+      // Start all fans in this column, then delay before next column
+      Promise.all(columnPromises); // Don't await - let them run
+      
+      // Delay before next column
+      if (col < maxSeats - 1) {
+        await new Promise(resolve => {
+          this.scene.time.delayedCall(columnDelay, resolve);
+        });
+      }
+    }
+
+    // Wait a short buffer for the final column to start before reporting completion
+    await new Promise(resolve => {
+      this.scene.time.delayedCall(40, resolve);
     });
-    return Promise.all(promises).then(() => undefined);
+
+    const participationRate = totalFans > 0 ? participatingFans / totalFans : 0;
+    return { participatingFans, totalFans, participationRate };
   }
 
   /**

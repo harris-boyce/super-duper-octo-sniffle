@@ -204,14 +204,20 @@ export class StadiumScene extends Phaser.Scene {
       // Increment success streak
       this.successStreak++;
 
-      // Play the visual wave for fans in this section and await completion,
-      // then trigger an immediate per-section poke jiggle.
-      await section.playWave();
+      // Play the visual wave with individual fan participation tracking
+      const result = await section.playWave();
+      
+      // Check for wave sputter
+      if (this.waveManager.checkWaveSputter(result.participationRate)) {
+        console.log(`Wave sputter activated! Participation: ${Math.round(result.participationRate * 100)}%`);
+      }
+
+      // Trigger per-section poke jiggle for participating fans only
       const fans = section.getFans();
       fans.forEach((f) => f.pokeJiggle(0.9, 900));
 
-      // Flash green effect after wave animation
-      await section.flashSuccess();
+      // Flash green effect after wave animation (no await so next section keeps flowing)
+      section.flashSuccess();
 
       // Add screen shake on success streak (3 or more)
       if (this.successStreak >= 3) {
@@ -226,14 +232,20 @@ export class StadiumScene extends Phaser.Scene {
       // Reset success streak
       this.successStreak = 0;
 
-      // Also animate fans on section fail so the crowd still reacts,
-      // await their completion and then poke-jiggle the section.
-      await section.playWave();
+      // Play the visual wave with individual fan participation tracking
+      const result = await section.playWave();
+      
+      // Check for wave sputter
+      if (this.waveManager.checkWaveSputter(result.participationRate)) {
+        console.log(`Wave sputter activated! Participation: ${Math.round(result.participationRate * 100)}%`);
+      }
+
+      // Trigger per-section poke jiggle
       const fans = section.getFans();
       fans.forEach((f) => f.pokeJiggle(0.45, 700));
 
-      // Flash red effect after wave animation
-      await section.flashFail();
+      // Flash red effect after wave animation (non-blocking)
+      section.flashFail();
     });
 
     this.waveManager.on('waveComplete', () => {
@@ -246,9 +258,24 @@ export class StadiumScene extends Phaser.Scene {
   }
 
   update(time: number, delta: number): void {
-    // Update game state with elapsed time
+    // Update fan stats (thirst decay, happiness, attention)
     if (!this.demoMode) {
-      this.gameState.updateStats(delta);
+      this.sections.forEach(section => {
+        section.updateFanStats(delta);
+      });
+
+      // Sync section-level stats from fan aggregates for UI display
+      const sectionIds = ['A', 'B', 'C'];
+      for (let si = 0; si < 3; si++) {
+        const section = this.sections[si];
+        const sectionId = sectionIds[si];
+        const aggregate = section.getAggregateStats();
+        
+        // Update GameStateManager with aggregate values for UI display
+        this.gameState.updateSectionStat(sectionId, 'happiness', aggregate.happiness);
+        this.gameState.updateSectionStat(sectionId, 'thirst', aggregate.thirst);
+        this.gameState.updateSectionStat(sectionId, 'attention', aggregate.attention);
+      }
     }
 
     // Update vendor manager
@@ -277,19 +304,10 @@ export class StadiumScene extends Phaser.Scene {
     // Update visual displays
     this.updateDisplay();
 
-    // Update fans visuals according to section stats
-    const sectionIds = ['A', 'B', 'C'];
-    for (let si = 0; si < 3; si++) {
-      const section = this.sections[si];
-      const sectionId = sectionIds[si];
-      const sectionState = this.gameState.getSection(sectionId);
-      // intensity: thirsty OR distracted (low attention)
-      const thirstNorm = Phaser.Math.Clamp(sectionState.thirst / 100, 0, 1);
-      const distractNorm = Phaser.Math.Clamp((100 - sectionState.attention) / 100, 0, 1);
-      const intensity = Math.max(thirstNorm, distractNorm);
-
-      section.updateFanIntensity(intensity);
-    }
+    // Update fans visuals based on their personal thirst
+    this.sections.forEach(section => {
+      section.updateFanIntensity(); // No parameter = use personal thirst
+    });
   }
 
   /**
