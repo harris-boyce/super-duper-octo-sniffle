@@ -979,7 +979,7 @@ export class StadiumScene extends Phaser.Scene {
     if (btn.disabled) return;
     btn.disabled = true;
     this.waveManager.startWave();
-    setTimeout(()=>{ btn.disabled = false; }, 1500);
+    this.time.delayedCall(1500, () => { btn.disabled = false; });
   }
 
   /**
