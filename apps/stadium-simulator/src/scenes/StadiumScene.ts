@@ -96,7 +96,7 @@ export class StadiumScene extends Phaser.Scene {
     }).setOrigin(0, 0.5);
 
     // Section labels
-    this.add.text(200, 250, 'Section A', {
+    this.add.text(200, 140, 'Section A', {
       fontSize: '24px',
       fontFamily: 'Arial',
       color: '#ffffff',
@@ -107,7 +107,7 @@ export class StadiumScene extends Phaser.Scene {
       color: '#ffffff',
     }).setOrigin(0.5, 0);
 
-    this.add.text(500, 250, 'Section B', {
+    this.add.text(500, 140, 'Section B', {
       fontSize: '24px',
       fontFamily: 'Arial',
       color: '#ffffff',
@@ -118,7 +118,7 @@ export class StadiumScene extends Phaser.Scene {
       color: '#ffffff',
     }).setOrigin(0.5, 0);
 
-    this.add.text(800, 250, 'Section C', {
+    this.add.text(800, 140, 'Section C', {
       fontSize: '24px',
       fontFamily: 'Arial',
       color: '#ffffff',
