@@ -3,17 +3,17 @@ import { GameStateManager, GameMode } from '@/managers/GameStateManager';
 import { WaveManager } from '@/managers/WaveManager';
 import { VendorManager } from '@/managers/VendorManager';
 import { StadiumSection } from '@/sprites/StadiumSection';
-import { Vendor } from '@/sprites/Vendor';
 import { AnnouncerService } from '@/managers/AnnouncerService';
 import { SectionConfig } from '@/types/GameTypes';
 import { SeatManager } from '@/managers/SeatManager';
 import { gameBalance } from '@/config/gameBalance';
 
 /**
- * StadiumScene renders the visual state of the stadium simulator
+ * TestStadiumScene - Preserved version of original StadiumScene for testing
+ * Access via URL parameter: ?test=stadium
  * Orchestrates GameStateManager, WaveManager, VendorManager, and StadiumSection objects
  */
-export class StadiumScene extends Phaser.Scene {
+export class TestStadiumScene extends Phaser.Scene {
   private gameState: GameStateManager;
   private waveManager!: WaveManager;
   private vendorManager!: VendorManager;
@@ -25,11 +25,8 @@ export class StadiumScene extends Phaser.Scene {
   private countdownText?: Phaser.GameObjects.Text;
   private sessionTimerText?: Phaser.GameObjects.Text;
   private sections: StadiumSection[] = [];
-  private vendorSprites: Map<number, Vendor> = new Map(); // Track vendor visual sprites
   private demoMode: boolean = false;
   private debugMode: boolean = false;
-  private logWaveEvents: boolean = false;
-  private logVendorEvents: boolean = false;
   private successStreak: number = 0;
   private gameMode: GameMode = 'eternal';
   private sessionCountdownOverlay?: Phaser.GameObjects.Container;
@@ -39,7 +36,7 @@ export class StadiumScene extends Phaser.Scene {
   private hasLoggedUpdate: boolean = false;
 
   constructor() {
-    super({ key: 'StadiumScene' });
+    super({ key: 'TestStadiumScene' });
     this.gameState = new GameStateManager();
   }
 
@@ -85,15 +82,6 @@ export class StadiumScene extends Phaser.Scene {
     if (sectionConfig.autoPopulate) {
       this.seatManager.populateAllSeats();
     }
-
-    // Initialize VendorManager with sections for pathfinding
-    this.vendorManager.initializeSections(this.sections);
-
-    // Listen to vendor events BEFORE spawning (important!)
-    this.setupVendorEventListeners();
-
-    // Spawn initial vendors (2 good-quality drink vendors by default)
-    this.vendorManager.spawnInitialVendors();
 
     // Initialize WaveManager with VendorManager and SeatManager
     this.waveManager = new WaveManager(this.gameState, this.vendorManager, this.seatManager);
@@ -475,9 +463,6 @@ export class StadiumScene extends Phaser.Scene {
 
     // Update vendor manager
     this.vendorManager.update(delta);
-    
-    // Update vendor visual positions
-    this.updateVendorPositions();
 
     // Check for autonomous wave triggering (only when session is active)
     if (gameBalance.waveAutonomous.enabled && 
@@ -487,7 +472,7 @@ export class StadiumScene extends Phaser.Scene {
       if (triggerSection) {
         const wave = this.waveManager.createWave(triggerSection);
         this.showIncomingCue(triggerSection);
-        this.logWave(`[Wave] Autonomous start section ${triggerSection} waveId=${wave.id}`);
+        console.log(`[Autonomous Wave] Started from section ${triggerSection}, Wave ID: ${wave.id}`);
       }
     }
 
@@ -912,38 +897,6 @@ export class StadiumScene extends Phaser.Scene {
     });
     controlsDiv.appendChild(boosterRow);
 
-    // Logging controls
-    const loggingRow = document.createElement('div');
-    loggingRow.style.cssText = 'display:flex;gap:10px;margin-top:8px;padding-top:8px;border-top:1px solid #00ff00;';
-    
-    const waveLogLabel = document.createElement('label');
-    waveLogLabel.style.cssText = 'font-size:11px;cursor:pointer;';
-    const waveLogCheckbox = document.createElement('input');
-    waveLogCheckbox.type = 'checkbox';
-    waveLogCheckbox.checked = this.logWaveEvents;
-    waveLogCheckbox.onchange = () => {
-      this.logWaveEvents = waveLogCheckbox.checked;
-      this.addDebugEvent(`[DEBUG] Wave logging ${this.logWaveEvents ? 'enabled' : 'disabled'}`);
-    };
-    waveLogLabel.appendChild(waveLogCheckbox);
-    waveLogLabel.appendChild(document.createTextNode(' Log Wave Events'));
-    
-    const vendorLogLabel = document.createElement('label');
-    vendorLogLabel.style.cssText = 'font-size:11px;cursor:pointer;';
-    const vendorLogCheckbox = document.createElement('input');
-    vendorLogCheckbox.type = 'checkbox';
-    vendorLogCheckbox.checked = this.logVendorEvents;
-    vendorLogCheckbox.onchange = () => {
-      this.logVendorEvents = vendorLogCheckbox.checked;
-      this.addDebugEvent(`[DEBUG] Vendor logging ${this.logVendorEvents ? 'enabled' : 'disabled'}`);
-    };
-    vendorLogLabel.appendChild(vendorLogCheckbox);
-    vendorLogLabel.appendChild(document.createTextNode(' Log Vendor Events'));
-    
-    loggingRow.appendChild(waveLogLabel);
-    loggingRow.appendChild(vendorLogLabel);
-    controlsDiv.appendChild(loggingRow);
-
     debugPanel.appendChild(controlsDiv);
 
     // Stats / events display
@@ -1055,164 +1008,6 @@ export class StadiumScene extends Phaser.Scene {
       // Unified prefix for easier grep
       console.log(`[DBG] ${message}`);
     }
-  }
-
-  private logWave(message: string): void {
-    if (!this.logWaveEvents) return;
-    console.log(message);
-    this.addDebugEvent(message);
-  }
-
-  private logVendor(message: string): void {
-    if (!this.logVendorEvents) return;
-    console.log(message);
-    this.addDebugEvent(message);
-  }
-
-  /**
-   * Setup vendor event listeners
-   */
-  private setupVendorEventListeners(): void {
-    // Listen for vendor spawned events to create visual sprites
-    this.vendorManager.on('vendorSpawned', (data: { vendorId: number; profile: any }) => {
-      this.logVendor(`[Vendor] Spawned vendor ${data.vendorId}`);
-      const { vendorId, profile } = data;
-      
-      // Position vendors spread out near sections (equidistant from center)
-      const vendorCount = this.vendorSprites.size;
-      const spacing = 250; // pixels between vendors
-      const startX = this.cameras.main.centerX - (spacing / 2) + (vendorCount * spacing);
-      const startY = 550; // front corridor area
-      
-      // Create vendor visual sprite
-      const vendorSprite = new Vendor(this, startX, startY);
-      vendorSprite.setDepth(1000); // Render above fans
-      this.logVendor(`[Vendor] Sprite created at (${startX}, ${startY})`);
-      
-      // Store reference
-      this.vendorSprites.set(vendorId, vendorSprite);
-      this.logVendor(`[Vendor] Total sprites: ${this.vendorSprites.size}`);
-      
-      // Add sprite to scene
-      this.add.existing(vendorSprite);
-      
-      // Update vendor instance position in manager
-      const instance = this.vendorManager.getVendorInstance(vendorId);
-      if (instance) {
-        instance.position.x = startX;
-        instance.position.y = startY;
-      }
-      
-      this.logVendor(`[Vendor] Profile type=${profile.type} quality=${profile.qualityTier}`);
-
-      // Rebuild vendor controls dynamically
-      this.rebuildVendorControls();
-    });
-
-    // Listen for vendor state changes to update visuals
-    this.vendorManager.on('vendorReachedTarget', (data: { vendorId: number; position: any }) => {
-      this.logVendor(`[Vendor] Vendor ${data.vendorId} reached target`);
-    });
-
-    this.vendorManager.on('serviceComplete', (data: { vendorId: number; fanServed?: boolean }) => {
-      const sprite = this.vendorSprites.get(data.vendorId);
-      if (sprite) {
-        sprite.setMovementState('cooldown');
-      }
-      this.logVendor(`[Vendor] Vendor ${data.vendorId} completed service`);
-    });
-
-    this.vendorManager.on('vendorDistracted', (data: { vendorId: number }) => {
-      const sprite = this.vendorSprites.get(data.vendorId);
-      if (sprite) {
-        sprite.setMovementState('distracted');
-      }
-      this.logVendor(`[Vendor] Vendor ${data.vendorId} got distracted!`);
-    });
-
-    // Vendor section assignment
-    this.vendorManager.on('vendorSectionAssigned', (data: { vendorId: number; sectionIdx: number }) => {
-      this.logVendor(`[Vendor] Vendor ${data.vendorId} assigned to section ${['A','B','C'][data.sectionIdx]}`);
-      // Update UI highlight
-      this.rebuildVendorControls();
-    });
-
-    // Scan attempt events
-    this.vendorManager.on('vendorScanAttempt', (data: { vendorId: number; assignedSectionIdx?: number }) => {
-      const sec = data.assignedSectionIdx !== undefined ? ['A','B','C'][data.assignedSectionIdx] : 'ALL';
-      this.logVendor(`[Vendor] Vendor ${data.vendorId} scanning (scope=${sec})`);
-    });
-    this.vendorManager.on('vendorTargetSelected', (data: { vendorId: number; sectionIdx: number; rowIdx: number; colIdx: number }) => {
-      this.logVendor(`[Vendor] Vendor ${data.vendorId} target selected S=${['A','B','C'][data.sectionIdx]} R=${data.rowIdx} C=${data.colIdx}`);
-    });
-    this.vendorManager.on('vendorNoTarget', (data: { vendorId: number; assignedSectionIdx?: number }) => {
-      const sec = data.assignedSectionIdx !== undefined ? ['A','B','C'][data.assignedSectionIdx] : 'ALL';
-      this.logVendor(`[Vendor] Vendor ${data.vendorId} no target found (scope=${sec})`);
-    });
-  }
-
-  /**
-   * Update vendor visual positions based on manager state
-   */
-  private updateVendorPositions(): void {
-    for (const [vendorId, sprite] of this.vendorSprites) {
-      const instance = this.vendorManager.getVendorInstance(vendorId);
-      if (!instance) continue;
-
-      // Update sprite position to match instance position
-      sprite.setPosition(instance.position.x, instance.position.y);
-
-      // Update sprite state to match vendor state
-      sprite.setMovementState(instance.state);
-    }
-  }
-
-  /**
-   * Dynamically rebuild vendor assignment controls based on active vendors
-   */
-  private rebuildVendorControls(): void {
-    const controlsRoot = document.getElementById('controls');
-    if (!controlsRoot) return;
-    // Clear previous dynamic vendor controls (keep wave button if present)
-    // Remove all children then recreate
-    controlsRoot.innerHTML = '';
-    // Optionally re-add wave button if it existed
-    const waveBtn = document.createElement('button');
-    waveBtn.id = 'wave-btn';
-    waveBtn.textContent = 'START WAVE';
-    waveBtn.style.display = 'none';
-    controlsRoot.appendChild(waveBtn);
-
-    const vendorInstances = Array.from(this.vendorManager.getVendorInstances().entries());
-    vendorInstances.forEach(([vendorId, instance], idx) => {
-      const row = document.createElement('div');
-      row.className = 'vendor-controls';
-      row.style.cssText = 'display:flex;align-items:center;gap:6px;margin-top:6px;';
-      const label = document.createElement('span');
-      label.className = 'vendor-label';
-      label.textContent = `Vendor ${vendorId}:`;
-      label.style.cssText = 'font-size:12px;color:#ccc;';
-      row.appendChild(label);
-
-      // Determine serviceable sections (drink => all sections; later types may differ)
-      const serviceableSectionIndices: number[] = [0,1,2];
-      serviceableSectionIndices.forEach(sIdx => {
-        const btn = document.createElement('button');
-        btn.className = 'vendor-btn';
-        btn.textContent = `Section ${['A','B','C'][sIdx]}`;
-        btn.style.cssText = 'background:#111;border:1px solid #555;color:#eee;font-size:11px;padding:2px 6px;cursor:pointer;';
-        if (instance.assignedSectionIdx === sIdx) {
-          btn.style.border = '1px solid #0ff';
-          btn.style.background = '#033';
-        }
-        btn.onclick = () => {
-          this.vendorManager.assignVendorToSection(vendorId, sIdx);
-        };
-        row.appendChild(btn);
-      });
-
-      controlsRoot.appendChild(row);
-    });
   }
 }
 
