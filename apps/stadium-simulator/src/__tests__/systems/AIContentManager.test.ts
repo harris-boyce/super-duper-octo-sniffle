@@ -274,7 +274,6 @@ describe('AIContentManager', () => {
       const testEpoch = 15;
       
       // Check if content exists (may return false if IndexedDB unavailable)
-      const existsBefore = await manager.hasContentForEpoch(testEpoch);
       
       // Store content (should not throw even if storage unavailable)
       const testContent: GameAIContent = {
