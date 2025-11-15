@@ -425,8 +425,8 @@
         "scale": 1.0
       },
       "metadata": {
-        "model": "claude-3-5-sonnet-20241022",
-        "temperature": 0.8,
+        "model": "static-content",
+        "temperature": 0,
         "promptTokens": 0,
         "completionTokens": 0,
         "cost": 0,
