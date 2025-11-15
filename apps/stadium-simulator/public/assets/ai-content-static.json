@@ -3067,7 +3067,7 @@
     }
   ],
   "metadata": {
-    "totalItems": 113,
+    "totalItems": 113, // Sum of vendors (5), mascots (3), announcers (5), crowdChatter (100)
     "totalCost": 0,
     "totalTokens": 0,
     "generationTime": 0,
