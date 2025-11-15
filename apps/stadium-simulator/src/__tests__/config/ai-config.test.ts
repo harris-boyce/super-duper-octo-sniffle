@@ -5,7 +5,7 @@
  * and edge case handling for the AI content rotation system.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   aiConfig,
   getCurrentEpoch,
