@@ -333,6 +333,26 @@ export interface CostumeVariation {
 }
 
 /**
+ * Crowd chatter line
+ * 
+ * Short crowd reactions and comments that add atmosphere to the game.
+ */
+export interface CrowdChatter {
+  /** Unique identifier */
+  id: string;
+  /** The chatter text */
+  text: string;
+  /** Emotional tone */
+  emotion: EmotionType;
+  /** Tags for categorization */
+  tags: string[];
+  /** Priority for selection */
+  priority: number;
+  /** Minimum cooldown before reuse (milliseconds) */
+  cooldown: number;
+}
+
+/**
  * Game AI content collection
  * 
  * Top-level container for all AI-generated personalities and content.
@@ -353,6 +373,8 @@ export interface GameAIContent {
   mascots: MascotPersonality[];
   /** All announcer content sets */
   announcers: AnnouncerContent[];
+  /** Crowd chatter variations (optional) */
+  crowdChatter?: CrowdChatter[];
   /** Aggregate metadata for the entire content set */
   metadata: ContentSetMetadata;
 }
