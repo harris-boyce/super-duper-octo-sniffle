@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { gameBalance } from '@/config/gameBalance';
+import { BaseActorContainer } from './BaseActor';
 
 /**
  * Fan is a small container composed of two rectangles:
@@ -11,7 +12,7 @@ import { gameBalance } from '@/config/gameBalance';
  * - jiggle when intensity > 0
  * - playWave(delay, intensity) to perform the quick up/down motion with variable intensity
  */
-export class Fan extends Phaser.GameObjects.Container {
+export class Fan extends BaseActorContainer {
   private top: Phaser.GameObjects.Rectangle;
   private bottom: Phaser.GameObjects.Rectangle;
   private size: number;
@@ -38,7 +39,7 @@ export class Fan extends Phaser.GameObjects.Container {
   constructor(scene: Phaser.Scene, x: number, y: number, size = 28) {
     // We'll shift the container origin so local (0,0) sits at the bottom extremity
     // of the fan's body. That makes rotating the container rotate around that point.
-    super(scene, x, y);
+    super(scene, x, y, 'fan', false); // disabled by default (massive noise with 100+ fans)
     this.size = size;
 
     // Bottom is taller than it is wide

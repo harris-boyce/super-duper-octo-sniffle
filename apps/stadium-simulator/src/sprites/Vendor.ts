@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { VendorState } from '@/types/GameTypes';
 import type { VendorPersonality } from '@/types/personalities';
 import type { DialogueManager } from '@/systems/DialogueManager';
+import { BaseActorContainer } from './BaseActor';
 
 /**
  * Vendor is a visual container composed of two rectangles:
@@ -16,7 +17,7 @@ import type { DialogueManager } from '@/systems/DialogueManager';
  * 
  * Also supports personality integration for customized behavior and dialogue.
  */
-export class Vendor extends Phaser.GameObjects.Container {
+export class Vendor extends BaseActorContainer {
   private top: Phaser.GameObjects.Rectangle;
   private bottom: Phaser.GameObjects.Rectangle;
   private currentState: VendorState;
@@ -32,7 +33,7 @@ export class Vendor extends Phaser.GameObjects.Container {
     personality?: VendorPersonality,
     dialogueManager?: DialogueManager
   ) {
-    super(scene, x, y);
+    super(scene, x, y, 'vendor', false); // disabled by default
 
     // Body: green rectangle (20x30 pixels)
     this.bottom = scene.add.rectangle(0, 0, 20, 30, 0x00aa00).setOrigin(0.5, 0.5);
@@ -43,6 +44,7 @@ export class Vendor extends Phaser.GameObjects.Container {
 
     this.add([this.bottom, this.top]);
     this.currentState = 'idle';
+    this.logger.debug(`Spawned at (${x}, ${y})`);
 
     this.personality = personality || null;
     this.dialogueManager = dialogueManager || null;
@@ -169,7 +171,11 @@ export class Vendor extends Phaser.GameObjects.Container {
       this.stateAnimation = undefined;
     }
 
+    const prevState = this.currentState;
     this.currentState = state;
+    if (prevState !== state) {
+      this.logger.debug(`State: ${prevState} → ${state}`);
+    }
 
     switch (state) {
       case 'idle':
