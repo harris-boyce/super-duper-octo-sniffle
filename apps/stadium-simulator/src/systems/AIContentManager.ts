@@ -192,7 +192,7 @@ export class AIContentManager {
     let hash = 5381;
     for (let i = 0; i < seedInput.length; i++) {
       hash = ((hash << 5) + hash) + seedInput.charCodeAt(i);
-      hash = hash & hash; // Convert to 32-bit integer
+      hash = hash | 0; // Convert to 32-bit signed integer
     }
     
     // Convert to positive hex string, always 8 characters
