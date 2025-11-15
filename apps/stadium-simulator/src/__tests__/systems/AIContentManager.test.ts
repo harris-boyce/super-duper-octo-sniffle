@@ -353,8 +353,12 @@ describe('AIContentManager', () => {
       const retrieved = await manager.getMetadata('test-content-id');
       
       // In test environment without IndexedDB, this may be null
-      // The important part is that it doesn't throw
-      expect(retrieved === null || retrieved !== undefined).toBe(true);
+      // If not null, should match the stored metadata
+      if (retrieved !== null) {
+        expect(retrieved).toMatchObject(metadata);
+      } else {
+        expect(retrieved).toBeNull();
+      }
     });
 
     it('should return null for non-existent metadata', async () => {
