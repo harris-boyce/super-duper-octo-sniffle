@@ -220,7 +220,7 @@ export class WaveManager {
    */
   public setSessionStartTime(time: number): void {
     this.sessionStartTime = time;
-    console.log('[WaveManager] Session started, 5s delay before autonomous waves');
+    // legacy console logging removed
   }
 
   /** Classify a column participation rate */
@@ -272,13 +272,7 @@ export class WaveManager {
     const elapsed = now - this.lastWaveEndTime;
     const inCooldown = elapsed < this.lastWaveCooldownDuration;
     
-    if (inCooldown) {
-      const remaining = this.lastWaveCooldownDuration - elapsed;
-      // Only log occasionally to avoid spam
-      if (Math.floor(remaining / 1000) !== Math.floor((remaining + 16) / 1000)) {
-        console.log(`[Global Cooldown] ${Math.ceil(remaining / 1000)}s remaining`);
-      }
-    }
+    // legacy cooldown console logging removed
     
     return inCooldown;
   }
@@ -317,7 +311,7 @@ export class WaveManager {
     this.lastWaveEndTime = Date.now();
     this.lastWaveCooldownDuration = cooldown;
     
-    console.log(`[WaveManager] Wave ended (${success ? 'SUCCESS' : 'FAIL'}), cooldown: ${cooldown}ms`);
+    // legacy wave end console logging removed
     
     // Emit event with cooldown info
     this.emit('waveCooldownStarted', { success, cooldown, endsAt: this.lastWaveEndTime + cooldown });
@@ -361,8 +355,7 @@ export class WaveManager {
     const shouldLog = (now - this.lastProbabilityCheckLog) > 1000; // Log max once per second
 
     if (shouldLog) {
-      console.log('[Wave Probability] === CHECK START ===');
-      this.lastProbabilityCheckLog = now;
+      this.lastProbabilityCheckLog = now; // logging suppressed
     }
 
     // Create weighted section order
@@ -387,16 +380,14 @@ export class WaveManager {
       return b.weight - a.weight; // Higher weight first
     });
 
-    if (shouldLog) {
-      console.log(`  Check order: ${weightedSections.map(ws => ws.section.id).join(' → ')}`);
-    }
+    // suppressed probability order logging
 
     // Check each section in weighted random order
     for (const { section, index } of weightedSections) {
       // Check per-section cooldown - skip if on cooldown
       const canStart = this.canSectionStartWave(section.id);
       if (!canStart) {
-        if (shouldLog) console.log(`  ${section.id}: IN COOLDOWN (skipping)`);
+        // suppressed cooldown skip logging
         continue;
       }
 
@@ -420,18 +411,16 @@ export class WaveManager {
       const roll = Math.random();
 
       if (shouldLog) {
-        const band = baseProbability === 0.40 ? 'LOW' : baseProbability === 0.60 ? 'MED' : 'HIGH';
-        console.log(`  ${section.id}: happiness=${avgHappiness.toFixed(1)}, band=${band} (${(baseProbability * 100).toFixed(0)}%), roll=${(roll * 100).toFixed(1)}%`);
+        // suppressed per-section probability detail logging
       }
 
       // Check if this section triggers a wave
       if (roll < baseProbability) {
-        console.log(`[Wave Probability] ${section.id}: WAVE TRIGGERED! 🌊`);
-        return section.id;
+        return section.id; // suppressed trigger logging
       }
     }
 
-    if (shouldLog) console.log('[Wave Probability] No trigger');
+    // suppressed no-trigger logging
     return null;
   }
 
@@ -465,7 +454,7 @@ export class WaveManager {
 
     // Actually start the wave propagation!
     this.startWave();
-    console.log(`[WaveManager] Wave ${wave.id} created from ${originSectionId}, path: ${wavePath.join('→')}`);
+    // suppressed wave creation logging
 
     return wave;
   }
@@ -712,7 +701,7 @@ export class WaveManager {
       const sections = this.gameState.getSections();
       const originIndex = sections.findIndex(s => s.id === this.activeWave!.originSection);
       this.currentSection = originIndex >= 0 ? originIndex : 0;
-      console.log(`[WaveManager] Starting wave from section ${this.activeWave.originSection} (index ${this.currentSection})`);
+      // suppressed wave start logging
     } else {
       this.currentSection = 0;
     }
@@ -756,7 +745,7 @@ export class WaveManager {
     
     // Use Wave instance path if available, otherwise default to A→B→C
     const sections = this.activeWave ? this.activeWave.path : ['A', 'B', 'C'];
-    console.log(`[WaveManager] Propagating wave along path: ${sections.join('→')}`);
+    // suppressed wave propagation path logging
     
     let hasFailedOnce = false;
 

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { VendorState } from '@/types/GameTypes';
+import { BaseActorContainer } from './BaseActor';
 
 /**
  * Vendor is a visual container composed of two rectangles:
@@ -12,14 +13,14 @@ import type { VendorState } from '@/types/GameTypes';
  * - serving: service animation
  * - distracted: shake/confusion effect
  */
-export class Vendor extends Phaser.GameObjects.Container {
+export class Vendor extends BaseActorContainer {
   private top: Phaser.GameObjects.Rectangle;
   private bottom: Phaser.GameObjects.Rectangle;
   private currentState: VendorState;
   private stateAnimation?: Phaser.Time.TimerEvent;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
-    super(scene, x, y);
+    super(scene, x, y, 'vendor', false); // disabled by default
 
     // Body: green rectangle (20x30 pixels)
     this.bottom = scene.add.rectangle(0, 0, 20, 30, 0x00aa00).setOrigin(0.5, 0.5);
@@ -30,6 +31,7 @@ export class Vendor extends Phaser.GameObjects.Container {
 
     this.add([this.bottom, this.top]);
     this.currentState = 'idle';
+    this.logger.debug(`Spawned at (${x}, ${y})`);
 
     // Note: Don't call scene.add.existing here - let the caller decide
   }
@@ -45,7 +47,11 @@ export class Vendor extends Phaser.GameObjects.Container {
       this.stateAnimation = undefined;
     }
 
+    const prevState = this.currentState;
     this.currentState = state;
+    if (prevState !== state) {
+      this.logger.debug(`State: ${prevState} → ${state}`);
+    }
 
     switch (state) {
       case 'idle':
