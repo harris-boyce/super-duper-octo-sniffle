@@ -268,4 +268,61 @@ export class SeatManager {
       y: section.y
     };
   }
+
+  /**
+   * Get tight seat-based bounds for a section using actual seat positions.
+   * - left/right: first/last seat center X in world space
+   * - top/bottom: section container bounds (for vertical line rendering)
+   */
+  public getSectionSeatBounds(sectionId: string): { left: number; right: number; top: number; bottom: number } | null {
+    const section = this.sections.find(s => s['sectionId'] === sectionId);
+    if (!section) return null;
+
+    const rows = section.getRows();
+    if (!rows || rows.length === 0) return null;
+
+    const firstRow = rows[0];
+    const seats = firstRow.getSeats();
+    if (!seats || seats.length === 0) return null;
+
+    const firstSeatPos = seats[0].getPosition();
+    const lastSeatPos = seats[seats.length - 1].getPosition();
+
+    // StadiumSection is a Container centered at (section.x, section.y)
+    const left = section.x + firstSeatPos.x;
+    const right = section.x + lastSeatPos.x;
+
+    // Use section container height to define vertical line limits
+    const bounds = section.getBounds();
+    const top = bounds.y;
+    const bottom = bounds.y + bounds.height;
+
+    return { left, right, top, bottom };
+  }
+
+  /**
+   * Get ordered grid columns that span a section (left to right in world space).
+   * Returns array of { col: number; worldX: number } for each grid column.
+   */
+  public getSectionGridColumns(sectionId: string): Array<{ col: number; worldX: number }> | null {
+    if (!this.gridManager) return null;
+    
+    const bounds = this.getSectionSeatBounds(sectionId);
+    if (!bounds) return null;
+
+    const leftCell = this.gridManager.worldToGrid(bounds.left, (bounds.top + bounds.bottom) / 2);
+    const rightCell = this.gridManager.worldToGrid(bounds.right, (bounds.top + bounds.bottom) / 2);
+    if (!leftCell || !rightCell) return null;
+
+    const columns: Array<{ col: number; worldX: number }> = [];
+    const minCol = Math.min(leftCell.col, rightCell.col);
+    const maxCol = Math.max(leftCell.col, rightCell.col);
+
+    for (let c = minCol; c <= maxCol; c++) {
+      const pos = this.gridManager.gridToWorld(leftCell.row, c);
+      columns.push({ col: c, worldX: pos.x });
+    }
+
+    return columns;
+  }
 }

@@ -1,22 +1,22 @@
 import { Fan } from './Fan';
+import { UtilityActor } from '@/actors/Actor';
 import type { VendorAbilities } from '@/types/GameTypes';
 import { gameBalance } from '@/config/gameBalance';
 
 /**
  * Represents a seat in a stadium section row
  */
-export class Seat {
+export class Seat extends UtilityActor {
   public readonly seatIndex: number;
-  public readonly x: number;
-  public readonly y: number;
   private fan: Fan | null;
+  private static _counter = 0;
 
-  constructor(seatIndex: number, x: number, y: number) {
+  constructor(seatIndex: number, x: number, y: number, id?: string) {
+    super(id ?? `seat-${Seat._counter++}`, 'seat', 'seat', x, y, false);
     this.seatIndex = seatIndex;
-    this.x = x;
-    this.y = y;
     this.fan = null;
   }
+
 
   /** Assign a fan to this seat */
   assignFan(fan: Fan): void {
@@ -44,6 +44,10 @@ export class Seat {
   getPosition(): { x: number; y: number } {
     return { x: this.x, y: this.y };
   }
+
+  // UtilityActor required methods (no-op for Seat)
+  public update(delta: number): void {}
+  public draw(): void {}
 
   /**
    * Calculate traversal penalty for vendor pathfinding

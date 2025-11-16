@@ -58,25 +58,37 @@ describe('WaveManager', () => {
     });
   });
 
-  describe('propagateWave (sectionWave based)', () => {
-    it('emits sectionWave for each section', async () => {
+  describe('Sprite-driven propagation hooks', () => {
+    it('emits sectionWave for each section via sprite-enter events', async () => {
       const calls: string[] = [];
       waveManager.on('sectionWave', (data: { section: string }) => {
         calls.push(data.section);
         // Simulate scene classification always success
         waveManager.setLastSectionWaveState('success');
       });
-      waveManager.startWave();
-      await waveManager.updateCountdown(10000);
+
+      // Simulate WaveSprite entering sections sequentially
+      await (waveManager as any).handleSpriteEntersSection('A');
+      await (waveManager as any).handleSpriteEntersSection('B');
+      await (waveManager as any).handleSpriteEntersSection('C');
+
       expect(calls).toEqual(['A', 'B', 'C']);
     });
 
-    it('records waveResults using lastSectionWaveState', async () => {
-      waveManager.on('sectionWave', () => {
-        waveManager.setLastSectionWaveState('success');
-      });
-      waveManager.startWave();
-      await waveManager.updateCountdown(10000);
+    it('records waveResults using lastSectionWaveState on exit', async () => {
+      // A
+      await (waveManager as any).handleSpriteEntersSection('A');
+      waveManager.setLastSectionWaveState('success');
+      (waveManager as any).handleSpriteExitsSection('A');
+      // B
+      await (waveManager as any).handleSpriteEntersSection('B');
+      waveManager.setLastSectionWaveState('success');
+      (waveManager as any).handleSpriteExitsSection('B');
+      // C
+      await (waveManager as any).handleSpriteEntersSection('C');
+      waveManager.setLastSectionWaveState('success');
+      (waveManager as any).handleSpriteExitsSection('C');
+
       expect(waveManager.getWaveResults()).toHaveLength(3);
       expect(waveManager.getWaveResults().every(r => r.success)).toBe(true);
     });
@@ -90,12 +102,24 @@ describe('WaveManager', () => {
       expect(cb).toHaveBeenCalled();
     });
 
-    it('emits waveComplete after propagation', async () => {
+    it('emits waveComplete after sprite-driven completion', async () => {
       const cb = vi.fn();
-      waveManager.on('sectionWave', () => waveManager.setLastSectionWaveState('success'));
       waveManager.on('waveComplete', cb);
-      waveManager.startWave();
-      await waveManager.updateCountdown(10000);
+
+      // Simulate three sections processed
+      await (waveManager as any).handleSpriteEntersSection('A');
+      waveManager.setLastSectionWaveState('success');
+      (waveManager as any).handleSpriteExitsSection('A');
+      await (waveManager as any).handleSpriteEntersSection('B');
+      waveManager.setLastSectionWaveState('success');
+      (waveManager as any).handleSpriteExitsSection('B');
+      await (waveManager as any).handleSpriteEntersSection('C');
+      waveManager.setLastSectionWaveState('success');
+      (waveManager as any).handleSpriteExitsSection('C');
+
+      // WaveSprite signals path complete
+      (waveManager as any).handleWaveComplete();
+
       expect(cb).toHaveBeenCalled();
     });
   });

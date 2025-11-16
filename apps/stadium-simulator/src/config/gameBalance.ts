@@ -266,7 +266,7 @@ export const gameBalance = {
    */
   waveSprite: {
     visible: false, // Set to true to show wave sprite by default.
-    speed: 200, // pixels per second
+    speed: 266, // pixels per second (increased by 33%)
     debugColor: 0x00ffff, // cyan
     debugAlpha: 0.8,
     debugRadius: 12,

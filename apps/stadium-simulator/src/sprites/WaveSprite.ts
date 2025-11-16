@@ -168,7 +168,7 @@ export class WaveSprite extends UtilityActor {
       this.x = this.targetX;
       this.onMovementComplete();
     } else {
-      // Move toward target
+      // Move toward target (smooth interpolation)
       const direction = this.direction === 'right' ? 1 : -1;
       this.x += moveDistance * direction;
     }
@@ -215,6 +215,8 @@ export class WaveSprite extends UtilityActor {
           sectionIndex: i,
           x: this.x
         });
+        // Allow future re-entry triggers (for reverse/double waves)
+        this.hasEnteredSection.delete(section.id);
         this.logger.debug(`Exited section ${section.id}`);
       }
     }
