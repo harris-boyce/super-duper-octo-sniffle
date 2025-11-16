@@ -12,6 +12,7 @@ const BRIDGED_EVENTS = [
   'waveStrengthChanged',
   'waveBoosterApplied',
   'columnStateRecorded',
+  'columnWaveReached',
   'waveCooldownStarted',
   'waveCreated',
   'waveFinalized',
@@ -71,6 +72,7 @@ export class WaveManagerWrapper extends BaseManager {
   getColumnStateRecords(): Array<{ sectionId: string; columnIndex: number; participation: number; state: 'success'|'sputter'|'death' }> { return this.inner.getColumnStateRecords(); }
 
   // Proxy mutation / control methods used by scene
+  update(delta: number): void { this.inner.update(delta); }
   startWave(): void { this.inner.startWave(); }
   createWave(originSectionId: string, type: WaveType = 'NORMAL'): Wave { return this.inner.createWave(originSectionId, type); }
   consumeForcedFlags(): { sputter: boolean; death: boolean } { return this.inner.consumeForcedFlags(); }

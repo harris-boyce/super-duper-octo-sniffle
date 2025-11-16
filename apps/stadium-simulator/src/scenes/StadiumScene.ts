@@ -96,15 +96,38 @@ export class StadiumScene extends Phaser.Scene {
       autoPopulate: true,
     };
 
-    // Create 3 stadium sections
-    const sectionA = new StadiumSection(this, 200, 300, sectionConfig, 'A');
-    const sectionB = new StadiumSection(this, 500, 300, sectionConfig, 'B');
-    const sectionC = new StadiumSection(this, 800, 300, sectionConfig, 'C');
-    this.sections = [sectionA, sectionB, sectionC];
+    // Dynamic single-row section layout centered on screen, aligned to grid
+    const gsSections = this.rawGameState.getSections();
+    const sectionIdsDyn = gsSections.map(s => s.id);
+    const { cellSize } = this.gridManager ? this.gridManager.getWorldSize() : { cellSize: 32 } as any;
+    const gapCells = 2; // configurable gap (cells) between sections
+    const sectionGapPx = cellSize * gapCells;
+    const n = sectionIdsDyn.length;
+    const totalRowWidth = n * sectionConfig.width + Math.max(0, n - 1) * sectionGapPx;
+    const startX = Math.round(this.cameras.main.centerX - totalRowWidth / 2 + sectionConfig.width / 2);
+
+    // Compute ground-aligned Y so the bottom row's floor sits on a grid cell per groundLine
+    const rowCountCfg = sectionConfig.rowCount ?? 4;
+    const bottomRowHeight = Math.floor(sectionConfig.height / rowCountCfg);
+    const floorOffsetFromCenter = sectionConfig.height / 2 - bottomRowHeight * 0.15; // see SectionRow.getFloorY
+    let groundY = 300; // fallback
+    if (this.gridManager) {
+      const rows = this.gridManager.getRowCount();
+      const groundRowsFromBottom = gameBalance.grid.groundLine?.rowsFromBottom ?? 0;
+      const groundRowIndex = Math.max(0, rows - 1 - groundRowsFromBottom);
+      groundY = this.gridManager.gridToWorld(groundRowIndex, 0).y;
+    }
+    const sectionCenterY = Math.round(groundY - floorOffsetFromCenter);
+
+    // Instantiate sections dynamically
+    this.sections = sectionIdsDyn.map((id, i) => {
+      const x = startX + i * (sectionConfig.width + sectionGapPx);
+      return new StadiumSection(this, x, sectionCenterY, sectionConfig, id);
+    });
 
     // Register sections as actors
-    const sectionIds = ['A', 'B', 'C'];
-    [sectionA, sectionB, sectionC].forEach((section, idx) => {
+    const sectionIds = sectionIdsDyn;
+    this.sections.forEach((section, idx) => {
       const sectionId = sectionIds[idx];
       const actorId = ActorFactory.generateId('section', sectionId);
       const sectionActor = new SectionActor(actorId, section, sectionId, 'section', false);
@@ -272,12 +295,15 @@ export class StadiumScene extends Phaser.Scene {
     const forceSputter = () => {
       if (!this.waveManager.isActive() && this.gameState.getSessionState() === 'active') {
         this.forceSputterNextSection = true;
-        this.waveManager.startWave();
+        this.waveManager.setForceSputter(true);
+        // Ensure a Wave instance exists so the WaveSprite can spawn
+        const origin = this.pickOriginSectionId();
+        this.waveManager.createWave(origin);
         if (waveBtn) {
           waveBtn.disabled = true;
           waveBtn.textContent = 'WAVE IN PROGRESS...';
         }
-        console.log('[DEBUG] Force Sputter initiated - will degrade strength on section B');
+        console.log(`[DEBUG] Force Sputter initiated - will degrade strength (origin ${origin})`);
       }
     };
 
@@ -333,112 +359,51 @@ export class StadiumScene extends Phaser.Scene {
       this.updateWaveStrengthMeter(data.strength);
     });
 
+    // Grid-column-based wave participation (triggered as wave moves through grid)
+    this.waveManager.on('columnWaveReached', (data: { sectionId: string; gridCol: number; worldX: number; seatIds: string[]; seatCount: number }) => {
+      const sectionIndex = this.getSectionIndex(data.sectionId);
+      const section = this.sections[sectionIndex];
+      if (data.seatIds.length === 0) return;
+      const firstSeatId = data.seatIds[0];
+      const parts = firstSeatId.split('-');
+      if (parts.length < 4) return;
+      const columnIndex = parseInt(parts[3], 10);
+      if (isNaN(columnIndex)) return;
+
+      // Use waveStrength and visualState from event payload
+      const waveStrength = data.waveStrength ?? this.waveManager.getCurrentWaveStrength();
+      const visualState = data.visualState ?? 'full';
+      const participationMultiplier = 1; // TODO: Apply boosters if needed
+      // Calculate participation for this specific column
+      const fanStates = section.calculateColumnParticipation(columnIndex, waveStrength * participationMultiplier);
+      if (fanStates.length === 0) return;
+      let columnParticipating = 0;
+      for (const st of fanStates) {
+        if (st.willParticipate) {
+          columnParticipating++;
+        }
+      }
+      const columnRate = fanStates.length > 0 ? columnParticipating / fanStates.length : 0;
+      const columnState = this.waveManager.classifyColumn(columnRate);
+      // Record column state for analytics
+      this.waveManager.recordColumnState(data.sectionId, columnIndex, columnRate, columnState);
+      this.waveManager.pushColumnParticipation(columnRate);
+      // Trigger animation for this column immediately (no await - fire and forget)
+      section.playColumnAnimation(columnIndex, fanStates, visualState, waveStrength);
+      // Log every few columns to reduce spam
+      if (this.waveManager['currentGridColumnIndex'] % 5 === 0) {
+        console.log(`[Column Wave] Section ${data.sectionId} col ${columnIndex}: ${columnState} (${Math.round(columnRate*100)}%)`);
+      }
+    });
+
+    // Legacy section-wide wave event (kept for compatibility, but may be deprecated)
+    // Only use this to reset per-section fan state; actual animations happen per column
     this.waveManager.on('sectionWave', async (data: { section: string; strength: number; direction: 'left' | 'right' }) => {
       const sectionIndex = this.getSectionIndex(data.section);
       const section = this.sections[sectionIndex];
       section.resetFanWaveState();
-
-      const forced = this.waveManager.consumeForcedFlags();
-      let waveStrength = data.strength;
-      const direction = data.direction || 'right'; // Default to right if not specified
-      const cfg = gameBalance.waveClassification;
-      const baseRecoveryBonus = gameBalance.waveStrength.recoveryBonus;
-      const boosterType = this.waveManager.getLastBoosterType();
-      const participationMultiplier = boosterType === 'participation' ? this.waveManager.getWaveBoosterMultiplier() : 1;
-
-      if (forced.sputter) {
-        const degr = cfg.forcedSputterDegradationMin + Math.random() * (cfg.forcedSputterDegradationMax - cfg.forcedSputterDegradationMin);
-        waveStrength = Math.max(0, waveStrength - degr);
-        this.sceneLogger.log('debug', `[${data.section}] FORCED SPUTTER degrade=${Math.round(degr)}`);
-      }
-      if (forced.death) {
-        waveStrength = cfg.forcedDeathStrength;
-        this.sceneLogger.log('debug', `[${data.section}] FORCED DEATH strength=${waveStrength}`);
-      }
-
-      const rows = section.getRows();
-      const maxColumns = rows[0]?.getSeats().length ?? 8;
-      let totalFans = 0;
-      let totalParticipatingFans = 0;
-      let successCount = 0;
-      let sputterCount = 0;
-      let deathCount = 0;
-      let previousColumnState: 'success' | 'sputter' | 'death' = 'success';
-
-      // Determine column iteration order based on wave direction
-      const columnOrder = direction === 'left' 
-        ? Array.from({ length: maxColumns }, (_, i) => maxColumns - 1 - i) // Right to left: [7,6,5,4,3,2,1,0]
-        : Array.from({ length: maxColumns }, (_, i) => i); // Left to right: [0,1,2,3,4,5,6,7]
-
-      console.log(`[Wave Animation] Section ${data.section}: animating ${direction} (columns: ${columnOrder.slice(0, 3).join(',')}...)`);
-
-      for (let idx = 0; idx < maxColumns; idx++) {
-        const col = columnOrder[idx];
-        const fanStates = section.calculateColumnParticipation(col, waveStrength * participationMultiplier);
-        let columnParticipating = 0;
-        for (const st of fanStates) {
-          totalFans++;
-          if (st.willParticipate) {
-            totalParticipatingFans++;
-            columnParticipating++;
-          }
-        }
-        const columnRate = fanStates.length > 0 ? columnParticipating / fanStates.length : 0;
-        const columnState = this.waveManager.classifyColumn(columnRate);
-        this.waveManager.recordColumnState(data.section, col, columnRate, columnState);
-        this.waveManager.pushColumnParticipation(columnRate);
-
-        // Enhanced recovery (previous sputter -> current success)
-        if (previousColumnState === 'sputter' && columnState === 'success') {
-          const enhanced = this.waveManager.calculateEnhancedRecovery(previousColumnState, columnState); // returns recoveryPowerMultiplier or 0
-          if (enhanced > 0) {
-            const recoveryMultiplier = 1 + enhanced + (boosterType === 'recovery' ? (this.waveManager.getWaveBoosterMultiplier() - 1) : 0);
-            const bonus = baseRecoveryBonus * recoveryMultiplier;
-            waveStrength = Math.min(100, waveStrength + bonus);
-            this.waveManager.setWaveStrength(waveStrength);
-            this.sceneLogger.log('debug', `[${data.section}] Enhanced Recovery +${Math.round(bonus)} → ${Math.round(waveStrength)}`);
-          }
-        }
-
-        if (columnState === 'success') successCount++; else if (columnState === 'sputter') sputterCount++; else deathCount++;
-        previousColumnState = columnState;
-
-        let visualState: 'full' | 'sputter' | 'death' = columnState === 'success' ? 'full' : (columnState === 'sputter' ? 'sputter' : 'death');
-        await section.playColumnAnimation(col, fanStates, visualState, waveStrength);
-
-        if (idx < maxColumns - 1) {
-          await new Promise(res => this.time.delayedCall(gameBalance.waveTiming.columnDelay, res));
-        }
-      }
-
-      const participationRate = totalFans > 0 ? totalParticipatingFans / totalFans : 0;
-      let sectionState: 'success' | 'sputter' | 'death' = 'death';
-      if (successCount >= sputterCount && successCount >= deathCount) sectionState = 'success';
-      else if (sputterCount >= deathCount) sectionState = 'sputter';
-      else sectionState = 'death';
-      if (forced.death) sectionState = 'death';
-
-      if (sectionState === 'success') this.successStreak++; else this.successStreak = 0;
-
-      this.sceneLogger.log('info', `[${data.section}] ${sectionState.toUpperCase()} cols S:${successCount} SP:${sputterCount} D:${deathCount} rate=${Math.round(participationRate*100)}%`);
-      this.waveManager.adjustWaveStrength(sectionState, participationRate);
-      this.waveManager.setLastSectionWaveState(sectionState);
-
-      const fans = section.getFans();
-      fans.forEach(f => {
-        if (f._lastWaveParticipated) {
-          f.pokeJiggle(sectionState === 'success' ? 0.9 : 0.45, sectionState === 'success' ? 900 : 700);
-        }
-      });
-
-      if (sectionState === 'success') {
-        section.flashSuccess();
-        if (this.successStreak >= 3) this.cameras.main.shake(200, 0.005);
-      } else {
-        section.flashFail();
-      }
-
-      this.updateDebugStats();
+      // Column-driven flow handles participation and animations; nothing else here
+      return;
     });
 
     this.waveManager.on('waveComplete', () => {
@@ -506,6 +471,9 @@ export class StadiumScene extends Phaser.Scene {
     
     // Update vendor visual positions
     this.updateVendorPositions();
+
+    // Tick wave sprite movement and events (sprite-driven propagation)
+    this.waveManager.update(delta);
 
     // Check for autonomous wave triggering (only when session is active)
     if (gameBalance.waveAutonomous.enabled && 
@@ -923,8 +891,13 @@ export class StadiumScene extends Phaser.Scene {
     forceDeathBtn.style.cssText = 'background:#400;border:1px solid #f00;color:#f00;font-size:11px;padding:2px 6px;cursor:pointer;flex:1;';
     forceDeathBtn.onclick = () => {
       this.waveManager.setForceDeath(true);
-      this.startWaveWithDisable(forceDeathBtn);
-      this.sceneLogger.log('debug', '[DEBUG] Forced death requested');
+      // Ensure a Wave instance exists so the WaveSprite can spawn
+      const origin = this.pickOriginSectionId();
+      this.waveManager.createWave(origin);
+      // Briefly disable button to prevent rapid repeat
+      forceDeathBtn.disabled = true;
+      this.time.delayedCall(1500, () => { forceDeathBtn.disabled = false; });
+      this.sceneLogger.log('debug', `[DEBUG] Forced death requested (origin ${origin})`);
       this.updateDebugStats();
     };
     deathRow.appendChild(forceDeathBtn);
@@ -1142,8 +1115,21 @@ export class StadiumScene extends Phaser.Scene {
   private startWaveWithDisable(btn: HTMLButtonElement): void {
     if (btn.disabled) return;
     btn.disabled = true;
-    this.waveManager.startWave();
+    // Create a wave from the best origin so WaveSprite will spawn
+    const origin = this.pickOriginSectionId();
+    this.waveManager.createWave(origin);
     this.time.delayedCall(1500, () => { btn.disabled = false; });
+  }
+
+  /** Pick an origin section for debug starts (highest happiness, fallback 'A') */
+  private pickOriginSectionId(): string {
+    const sections = this.gameState.getSections();
+    if (!sections || sections.length === 0) return 'A';
+    let best = sections[0];
+    for (let i = 1; i < sections.length; i++) {
+      if (sections[i].happiness > best.happiness) best = sections[i];
+    }
+    return best.id;
   }
 
   /**

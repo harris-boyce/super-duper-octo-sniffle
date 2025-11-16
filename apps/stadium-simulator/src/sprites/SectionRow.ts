@@ -100,13 +100,19 @@ export class SectionRow {
   }
 
   /** Play wave animation for all fans in this row */
-  playWave(columnDelay: number, rowDelay: number): Promise<void> {
+  playWave(
+    columnDelay: number,
+    rowDelay: number,
+    intensity: number = 1.0,
+    visualState: 'full' | 'sputter' | 'death' = 'full',
+    waveStrength: number = 70
+  ): Promise<void> {
     const promises: Promise<void>[] = [];
     this.seats.forEach((seat, colIdx) => {
       const fan = seat.getFan();
       if (fan) {
         const delay = colIdx * columnDelay + this.rowIndex * rowDelay;
-        promises.push(fan.playWave(delay));
+        promises.push(fan.playWave(delay, intensity, visualState, waveStrength));
       }
     });
     return Promise.all(promises).then(() => undefined);

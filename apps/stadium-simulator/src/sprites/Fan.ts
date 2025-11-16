@@ -201,7 +201,12 @@ export class Fan extends BaseActorContainer {
     });
   }
 
-  public playWave(delayMs = 0, intensity: number = 1.0, visualState: 'full' | 'sputter' | 'death' = 'full', waveStrength: number = 70): Promise<void> {
+  public playWave(
+    delayMs = 0,
+    intensity: number = 1.0,
+    visualState: 'full' | 'sputter' | 'death' = 'full',
+    waveStrength: number = 70
+  ): Promise<void> {
     // Adjust intensity for reduced-effort fans based on wave strength
     // Higher wave strength brings reduced-effort fans closer to full intensity
     let adjustedIntensity = intensity;
