@@ -456,13 +456,25 @@ export default async function handler(
     contentCache.set(epoch, content);
     
     // Return successful response
+    // Aggregate completion tokens from all content items
+    const announcerCompletionTokens = Array.isArray(content.announcers)
+      ? content.announcers.reduce((sum, a) => sum + (a?.metadata?.completionTokens || 0), 0)
+      : 0;
+    const vendorCompletionTokens = Array.isArray(content.vendors)
+      ? content.vendors.reduce((sum, v) => sum + (v?.metadata?.completionTokens || 0), 0)
+      : 0;
+    const mascotCompletionTokens = Array.isArray(content.mascots)
+      ? content.mascots.reduce((sum, m) => sum + (m?.metadata?.completionTokens || 0), 0)
+      : 0;
+    const totalCompletionTokens = announcerCompletionTokens + vendorCompletionTokens + mascotCompletionTokens;
+
     return res.status(200).json({
       content,
       cached: false,
       costEstimate: content.metadata.totalCost,
       tokenUsage: {
-        prompt: content.metadata.totalTokens - (content.announcers[0]?.metadata.completionTokens || 0),
-        completion: content.announcers[0]?.metadata.completionTokens || 0,
+        prompt: content.metadata.totalTokens - totalCompletionTokens,
+        completion: totalCompletionTokens,
         total: content.metadata.totalTokens
       },
       generationTime: content.metadata.generationTime,
