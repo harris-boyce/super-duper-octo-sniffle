@@ -100,6 +100,13 @@ export class AIManager {
   }
 
   /**
+   * Get path resolver for external access (e.g., GridOverlay debug visualization)
+   */
+  public getPathResolver(): HybridPathResolver | undefined {
+    return this.pathResolver;
+  }
+
+  /**
    * Create a new vendor with specified profile
    * @param type Vendor type ('drink' or 'rangedAoE')
    * @param quality Quality tier

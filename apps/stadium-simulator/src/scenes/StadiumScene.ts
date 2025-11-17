@@ -17,6 +17,7 @@ import { SkyboxActor } from '@/actors/adapters/SkyboxActor';
 import { FanActor } from '@/actors/adapters/FanActor';
 import { GridManager } from '@/managers/GridManager';
 import { LevelService } from '@/services/LevelService';
+import { GridOverlay } from '@/scenes/GridOverlay';
 
 /**
  * StadiumScene renders the visual state of the stadium simulator
@@ -46,6 +47,9 @@ export class StadiumScene extends Phaser.Scene {
   private hasLoggedUpdate: boolean = false;
   private actorRegistry: ActorRegistry;
   private levelData?: any; // Store level data for section ID lookups
+  private skyboxActor?: any;
+  private groundActor?: any;
+  private gridOverlay?: GridOverlay;
 
   constructor() {
     super({ key: 'StadiumScene' });
@@ -95,6 +99,7 @@ export class StadiumScene extends Phaser.Scene {
       bottomColor: gameBalance.visual.skyBottomColor
     });
     this.actorRegistry.register(skyboxActor);
+    this.skyboxActor = skyboxActor;
 
     // Create ground
     const groundHeight = canvasHeight - groundLineY;
@@ -107,6 +112,7 @@ export class StadiumScene extends Phaser.Scene {
       color: gameBalance.visual.groundColor
     });
     this.actorRegistry.register(groundActor);
+    this.groundActor = groundActor;
 
     // Initialize GameStateManager with level sections
     this.gameState.initializeSections(levelData.sections);
@@ -252,6 +258,48 @@ export class StadiumScene extends Phaser.Scene {
 
     // Create wave strength meter (will be shown on wave start)
     this.createWaveStrengthMeter();
+
+    // Create GridOverlay for debug rendering (must be in same scene as camera)
+    if (this.gridManager) {
+      this.gridOverlay = new GridOverlay(this, this.gridManager);
+      this.gridOverlay.setStadiumScene(this);
+      this.gridOverlay.setAIManager(this.aiManager);
+      
+      // Setup keyboard toggles for grid overlay
+      const keyboard = this.input.keyboard;
+      if (keyboard) {
+        // G key: Toggle grid visibility
+        keyboard.addKey('G').on('down', () => {
+          if (this.gridOverlay) {
+            const newVisibility = !this.gridOverlay.visible;
+            this.gridOverlay.setDebugVisible(newVisibility);
+            console.log(`[StadiumScene] Grid overlay: ${newVisibility ? 'ON' : 'OFF'}`);
+          }
+        });
+
+        // N key: Toggle navigation nodes (only if grid visible)
+        keyboard.addKey('N').on('down', () => {
+          if (this.gridOverlay) {
+            this.gridOverlay.toggleNodes();
+          }
+        });
+
+        // V key: Toggle vendor paths (only if grid visible)
+        keyboard.addKey('V').on('down', () => {
+          if (this.gridOverlay) {
+            this.gridOverlay.toggleVendorPaths();
+          }
+        });
+      }
+    }
+
+    // Notify WorldScene that initialization is complete
+    this.events.emit('stadiumReady', { aiManager: this.aiManager });
+    console.log('[StadiumScene] Initialization complete, emitted stadiumReady event');
+
+    // Notify WorldScene that initialization is complete
+    this.events.emit('stadiumReady', { aiManager: this.aiManager });
+    console.log('[StadiumScene] Initialization complete, emitted stadiumReady event');
 
     // Section labels are now fully handled by SectionActor; no logic here
 
@@ -1320,6 +1368,32 @@ export class StadiumScene extends Phaser.Scene {
 
       controlsRoot.appendChild(row);
     });
+  }
+
+  /**
+   * Get AIManager instance for external access (e.g., GridOverlay)
+   */
+  public getAIManager(): AIManager {
+    return this.aiManager;
+  }
+
+  /**
+   * Set background alpha (skybox and ground) for debug visualization
+   */
+  public setBackgroundAlpha(alpha: number): void {
+    if (this.skyboxActor && this.skyboxActor.getSkybox) {
+      const skybox = this.skyboxActor.getSkybox();
+      if (skybox) {
+        skybox.setAlpha(alpha);
+      }
+    }
+    
+    if (this.groundActor && this.groundActor.getGround) {
+      const ground = this.groundActor.getGround();
+      if (ground) {
+        ground.setAlpha(alpha);
+      }
+    }
   }
 }
 
