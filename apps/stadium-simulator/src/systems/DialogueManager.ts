@@ -311,7 +311,7 @@ export class DialogueManager {
   public getCharacterUsage(characterId: string): DialogueUsage[] {
     const usage: DialogueUsage[] = [];
     
-    for (const [key, value] of this.usageMap.entries()) {
+    for (const value of this.usageMap.values()) {
       if (value.characterId === characterId) {
         usage.push({ ...value });
       }
