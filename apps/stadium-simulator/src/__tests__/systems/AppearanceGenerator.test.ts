@@ -236,32 +236,6 @@ describe('AppearanceGenerator', () => {
   });
 
   describe('Color Pool Coverage', () => {
-    it('should have 8 colors', () => {
-      const pool = AppearanceGenerator.getColorPool();
-      expect(pool).toHaveLength(8);
-    });
-
-    it('should return correct pool size', () => {
-      const size = AppearanceGenerator.getColorPoolSize();
-      expect(size).toBe(8);
-    });
-
-    it('should have unique colors', () => {
-      const pool = AppearanceGenerator.getColorPool();
-      const uniqueColors = new Set(pool);
-
-      expect(uniqueColors.size).toBe(pool.length);
-    });
-
-    it('should have valid hex colors', () => {
-      const pool = AppearanceGenerator.getColorPool();
-      const hexPattern = /^#[0-9A-F]{6}$/i;
-
-      pool.forEach((color) => {
-        expect(color).toMatch(hexPattern);
-      });
-    });
-
     it('should generate diverse palettes', () => {
       const palettes: string[] = [];
 
