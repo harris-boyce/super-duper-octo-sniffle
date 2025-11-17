@@ -259,7 +259,7 @@ export const gameBalance = {
       gridLineWidth: 1,
       wallLineWidth: 3,
       toggleKey: 'G',
-      depth: -50,
+      depth: 10000, // Render on top of everything for debug visibility
     },
   },
 

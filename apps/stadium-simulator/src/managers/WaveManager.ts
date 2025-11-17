@@ -443,7 +443,7 @@ export class WaveManager {
       const elapsed = Date.now() - this.sessionStartTime;
       const startupDelay = 5000; // 5 seconds
       if (elapsed < startupDelay) {
-        console.log(`[WaveManager.checkWaveProbability] Startup delay: ${elapsed}ms/${startupDelay}ms`);
+        // console.log(`[WaveManager.checkWaveProbability] Startup delay: ${elapsed}ms/${startupDelay}ms`);
         return null; // Too early, don't even check
       }
     }
