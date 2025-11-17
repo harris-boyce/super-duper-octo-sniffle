@@ -2,7 +2,7 @@
  * Type definitions for the actor system.
  */
 
-export type ActorCategory = 'fan' | 'vendor' | 'mascot' | 'section' | 'row' | 'seat' | 'wave' | 'waypoint' | 'zone';
+export type ActorCategory = 'fan' | 'vendor' | 'mascot' | 'section' | 'row' | 'seat' | 'wave' | 'waypoint' | 'zone' | 'stairs' | 'ground' | 'skybox';
 
 export type ActorKind = 'animated' | 'scenery' | 'utility';
 

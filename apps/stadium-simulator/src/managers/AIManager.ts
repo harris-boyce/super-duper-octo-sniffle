@@ -5,6 +5,7 @@ import type { StadiumSection } from '@/sprites/StadiumSection';
 import type { GridManager } from './GridManager';
 import { gameBalance } from '@/config/gameBalance';
 import { HybridPathResolver } from './HybridPathResolver';
+import type { ActorRegistry } from '@/actors/ActorRegistry';
 
 /**
  * Represents a legacy vendor in the stadium (deprecated)
@@ -55,6 +56,7 @@ export class AIManager {
   private pathResolver?: HybridPathResolver;
   private sections: StadiumSection[];
   private gridManager?: GridManager;
+  private actorRegistry?: ActorRegistry;
   private nextVendorId: number = 0;
 
   /**
@@ -62,10 +64,12 @@ export class AIManager {
    * @param gameState - The GameStateManager instance to use for vendor actions
    * @param vendorCount - The number of legacy vendors to create (default: 2, deprecated)
    * @param gridManager - Optional GridManager for grid-based pathfinding
+   * @param actorRegistry - Optional ActorRegistry for stairs/navigation data
    */
-  constructor(gameState: GameStateManager, vendorCount: number = 2, gridManager?: GridManager) {
+  constructor(gameState: GameStateManager, vendorCount: number = 2, gridManager?: GridManager, actorRegistry?: ActorRegistry) {
     this.gameState = gameState;
     this.gridManager = gridManager;
+    this.actorRegistry = actorRegistry;
     this.eventListeners = new Map();
     this.vendors = new Map();
     this.legacyVendors = [];
@@ -92,7 +96,7 @@ export class AIManager {
    */
   public initializeSections(sections: StadiumSection[]): void {
     this.sections = sections;
-    this.pathResolver = new HybridPathResolver(sections, this.gridManager);
+    this.pathResolver = new HybridPathResolver(sections, this.gridManager, this.actorRegistry);
   }
 
   /**
@@ -200,12 +204,24 @@ export class AIManager {
    */
   public assignVendorToSection(vendorId: number, sectionIdx: number): void {
     const instance = this.vendors.get(vendorId);
-    if (!instance) return;
+    if (!instance) {
+      console.warn(`[AIManager] Cannot assign unknown vendor ${vendorId}`);
+      return;
+    }
+    
+    if (sectionIdx < 0 || sectionIdx >= this.sections.length) {
+      console.warn(`[AIManager] Invalid section index ${sectionIdx}`);
+      return;
+    }
+    
     instance.assignedSectionIdx = sectionIdx;
     instance.targetFan = undefined;
     instance.targetPosition = undefined;
+    instance.currentPath = undefined;
+    instance.currentSegmentIndex = 0;
     instance.state = 'idle'; // ensure target selection occurs
     instance.scanTimer = 0; // force immediate scan
+    console.log(`[AIManager] Vendor ${vendorId} assigned to section ${sectionIdx}`);
     this.emit('vendorSectionAssigned', { vendorId, sectionIdx });
   }
 
@@ -298,13 +314,14 @@ export class AIManager {
       stair: gameBalance.vendorMovement.baseSpeedStair,
       rowEntry: gameBalance.vendorMovement.baseSpeedRow,
       seat: gameBalance.vendorMovement.baseSpeedRow,
+      ground: gameBalance.vendorMovement.baseSpeedCorridor * 1.5, // Fast diagonal movement on ground
     };
 
     const baseSpeed = speedModifiers[currentSegment.nodeType];
     const qualityConfig = gameBalance.vendorQuality[instance.profile.qualityTier];
     const effectiveSpeed = baseSpeed * qualityConfig.efficiencyModifier;
 
-    // Simple linear interpolation toward target (pixels per second)
+    // Movement along path segments (pixels per second)
     const deltaSeconds = deltaTime / 1000;
     const moveDistance = effectiveSpeed * deltaSeconds;
 
@@ -313,7 +330,7 @@ export class AIManager {
     const distanceToTarget = Math.sqrt(dx * dx + dy * dy);
 
     if (distanceToTarget <= moveDistance) {
-      // Reached segment target
+      // Reached segment target - snap to exact position
       instance.position.x = currentSegment.x;
       instance.position.y = currentSegment.y;
       instance.currentSegmentIndex++;
@@ -326,7 +343,9 @@ export class AIManager {
         this.emit('vendorReachedTarget', { vendorId, position: instance.position });
       }
     } else {
-      // Move toward segment target
+      // Move toward segment target along straight line between nodes
+      // Note: Each segment represents movement between navigation nodes,
+      // so this straight line movement is constrained to the navigation graph
       const moveRatio = moveDistance / distanceToTarget;
       instance.position.x += dx * moveRatio;
       instance.position.y += dy * moveRatio;
@@ -449,9 +468,75 @@ export class AIManager {
           break;
 
         case 'planning':
-          // Plan path to target (stub for now)
+          // Plan path to target using HybridPathResolver
+          if (!this.pathResolver || !instance.targetPosition) {
+            console.warn(`[AIManager] Cannot plan path - missing pathResolver or targetPosition for vendor ${vendorId}`);
+            instance.state = 'idle';
+            break;
+          }
+
+          const targetSection = this.sections[instance.targetPosition.sectionIdx];
+          if (!targetSection) {
+            console.warn(`[AIManager] Invalid target section index ${instance.targetPosition.sectionIdx}`);
+            instance.state = 'idle';
+            break;
+          }
+
+          // Get target world position from section seat
+          const targetRow = targetSection.getRows()[instance.targetPosition.rowIdx];
+          const targetSeat = targetRow?.getSeats()[instance.targetPosition.colIdx];
+          if (!targetSeat) {
+            console.warn(`[AIManager] Invalid target seat position`);
+            instance.state = 'idle';
+            break;
+          }
+
+          const targetWorldPos = this.gridManager 
+            ? targetSeat.getWorldPosition(this.gridManager)
+            : targetSeat.getPosition();
+          
+          // Create target NavigationNode
+          const targetNode = {
+            type: 'seat' as const,
+            sectionIdx: instance.targetPosition.sectionIdx,
+            rowIdx: instance.targetPosition.rowIdx,
+            colIdx: instance.targetPosition.colIdx,
+            x: targetWorldPos.x,
+            y: targetWorldPos.y,
+            cost: 0,
+            heightLevel: 0
+          };
+          
+          const pathSegments = this.pathResolver.planPath(
+            instance.profile,
+            instance.position.x,
+            instance.position.y,
+            targetNode
+          );
+          
+          const path = pathSegments && pathSegments.length > 0 
+            ? { segments: pathSegments, totalCost: pathSegments.reduce((sum, s) => sum + s.cost, 0) }
+            : null;
+
+          if (!path || path.segments.length === 0) {
+            console.warn(`[AIManager] No path found for vendor ${vendorId} from (${instance.position.x}, ${instance.position.y}) to (${targetWorldPos.x}, ${targetWorldPos.y})`);
+            instance.state = 'idle';
+            instance.scanTimer = 2000; // Try again in 2s
+            break;
+          }
+
+          instance.currentPath = path.segments;
+          instance.currentSegmentIndex = 0;
           instance.state = 'movingSegment';
-          // TODO: Use pathResolver to generate currentPath
+          
+          // Debug: Log path details
+          console.log(`[AIManager] Vendor ${vendorId} path planned:`, {
+            segmentCount: path.segments.length,
+            totalCost: path.totalCost,
+            segments: path.segments.map(s => `${s.nodeType}(${Math.round(s.x)},${Math.round(s.y)})`).join(' -> ')
+          });
+          
+          this.emit('vendorPathPlanned', { vendorId, segmentCount: path.segments.length, totalCost: path.totalCost });
           break;
 
         case 'movingSegment':

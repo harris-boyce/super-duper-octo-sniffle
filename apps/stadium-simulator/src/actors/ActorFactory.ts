@@ -3,7 +3,7 @@
  * ID format: actor:<type>-<counter> (e.g., actor:fan-0, actor:vendor-1, actor:section-A)
  */
 
-type ActorType = 'fan' | 'vendor' | 'mascot' | 'section' | 'row' | 'seat' | 'wave' | 'waypoint' | 'zone';
+type ActorType = 'fan' | 'vendor' | 'mascot' | 'section' | 'row' | 'seat' | 'wave' | 'waypoint' | 'zone' | 'stairs' | 'ground' | 'skybox';
 
 export class ActorFactory {
   private static counters: Map<ActorType, number> = new Map();

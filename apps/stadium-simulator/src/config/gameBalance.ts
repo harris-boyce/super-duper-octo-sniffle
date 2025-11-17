@@ -245,7 +245,7 @@ export const gameBalance = {
       enabled: true,
       // Move ground just under halfway up the grid
       // For a 24-row grid (32px cells on 768px), this places ground near midline
-      rowsFromBottom: 11, // 0 = bottom-most row, higher = higher ground
+      rowsFromBottom: 6, // 0 = bottom-most row, higher = higher ground
     },
     // Directional wall defaults ensure outside-the-stadium cells are non-traversable
     defaultExteriorWall: true,
@@ -422,6 +422,19 @@ export const gameBalance = {
     logMovement: false, // log movement updates (verbose)
     renderPaths: true, // draw debug lines for paths
     renderAoE: true, // draw AoE radius circles
+  },
+
+  /**
+   * Visual environment configuration
+   */
+  visual: {
+    groundColor: 0x2d5016, // Medium-dark green
+    skyTopColor: 0x30a2d1, // Sky blue
+    skyBottomColor: 0x4682B4, // Steel blue (for future gradient)
+    stairsColor: 0xffffff, // White
+    stairsDepth: -50,
+    groundDepth: -100,
+    skyDepth: -101,
   },
 };
 

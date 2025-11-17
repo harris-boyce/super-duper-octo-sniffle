@@ -50,6 +50,8 @@ export class GridManager extends BaseManager {
   private readonly cellSize: number;
   private readonly offsetX: number;
   private readonly offsetY: number;
+  private readonly centerX: number;
+  private readonly centerY: number;
   private readonly rows: number;
   private readonly cols: number;
   private cells: GridCell[][] = [];
@@ -62,8 +64,12 @@ export class GridManager extends BaseManager {
     this.worldWidth = options.width;
     this.worldHeight = options.height;
     this.cellSize = options.cellSize ?? cfg.cellSize;
-    this.offsetX = options.offsetX ?? cfg.offsetX;
-    this.offsetY = options.offsetY ?? cfg.offsetY;
+    // Center of the canvas
+    this.centerX = this.worldWidth / 2;
+    this.centerY = this.worldHeight / 2;
+    // OffsetX/Y are now always zero (legacy, kept for compatibility)
+    this.offsetX = 0;
+    this.offsetY = 0;
     this.rows = Math.max(1, Math.ceil(this.worldHeight / this.cellSize));
     this.cols = Math.max(1, Math.ceil(this.worldWidth / this.cellSize));
 
@@ -80,24 +86,29 @@ export class GridManager extends BaseManager {
    * Convert world coordinates to grid coordinates (row/col).
    */
   public worldToGrid(x: number, y: number): { row: number; col: number } | null {
-    const localX = x - this.offsetX;
-    const localY = y - this.offsetY;
-    if (localX < 0 || localY < 0) return null;
-
-    const col = Math.floor(localX / this.cellSize);
-    const row = Math.floor(localY / this.cellSize);
-
-    if (!this.isValidCell(row, col)) return null;
-    return { row, col };
+    // Centered grid: (0,0) is at (centerX, centerY)
+    const localX = x - this.centerX;
+    const localY = y - this.centerY;
+    const col = Math.round(localX / this.cellSize);
+    const row = Math.round(localY / this.cellSize);
+    if (!this.isValidCell(row + Math.floor(this.rows / 2), col + Math.floor(this.cols / 2))) return null;
+    // Shift grid so (0,0) is center
+    return {
+      row: row + Math.floor(this.rows / 2),
+      col: col + Math.floor(this.cols / 2)
+    };
   }
 
   /**
    * Convert grid coordinates to world coordinates (cell center).
    */
   public gridToWorld(row: number, col: number): { x: number; y: number } {
+    // Centered grid: (0,0) is at (centerX, centerY)
+    const gridCol = col - Math.floor(this.cols / 2);
+    const gridRow = row - Math.floor(this.rows / 2);
     return {
-      x: this.offsetX + col * this.cellSize + this.cellSize / 2,
-      y: this.offsetY + row * this.cellSize + this.cellSize / 2,
+      x: this.centerX + gridCol * this.cellSize,
+      y: this.centerY + gridRow * this.cellSize,
     };
   }
 
