@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
-import { BaseActorSprite } from './BaseActor';
-import type { MascotPersonality, MascotAbility, AbilityEffect } from '@/types/personalities';
+import { BaseActorSprite } from './helpers/BaseActor';
+import type { MascotPersonality, MascotAbility, AbilityEffect } from '@/managers/interfaces/personalities';
 import type { DialogueManager } from '@/systems/DialogueManager';
 
 export type MascotContext = 'entrance' | 'hyping' | 'dancing' | 'disappointed' | 'ultimate' | 'exit';

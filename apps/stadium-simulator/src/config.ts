@@ -2,15 +2,15 @@ import Phaser from 'phaser';
 import { MenuScene } from './scenes/MenuScene';
 import { WorldScene } from './scenes/WorldScene';
 import { StadiumScene } from './scenes/StadiumScene';
-import { TestStadiumScene } from './scenes/TestStadiumScene';
 import { ScoreReportScene } from './scenes/ScoreReportScene';
 import { GameOverScene } from './scenes/GameOverScene';
 import { TestSectionScene } from './scenes/TestSectionScene';
 import { TestSectionDebugScene } from './scenes/TestSectionDebugScene';
 import { SpeechBubbleDemoScene } from './scenes/SpeechBubbleDemoScene';
+import { GridOverlay } from './scenes/GridOverlay';
 
 // Detect debug/test mode from URL before exporting config
-let scenes: Phaser.Types.Scenes.SceneType[] = [MenuScene, WorldScene, StadiumScene, ScoreReportScene, GameOverScene, TestSectionScene, TestStadiumScene];
+let scenes: Phaser.Types.Scenes.SceneType[] = [MenuScene, WorldScene, StadiumScene, ScoreReportScene, GameOverScene, TestSectionScene];
 try {
   const url = new URL(window.location.href);
   const testMode = url.searchParams.get('test');
@@ -20,8 +20,6 @@ try {
     scenes = [TestSectionDebugScene];
   } else if (demoMode === 'speech') {
     scenes = [SpeechBubbleDemoScene];
-  } else if (testMode === 'stadium') {
-    scenes = [TestStadiumScene];
   }
 } catch (e) {
   // fallback to default scenes
