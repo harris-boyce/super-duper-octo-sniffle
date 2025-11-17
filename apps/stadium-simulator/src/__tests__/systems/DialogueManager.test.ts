@@ -749,6 +749,44 @@ describe('DialogueManager', () => {
       expect(second).toBeDefined();
     });
 
+    it('should handle zero-weight priorities gracefully', () => {
+      const lines: DialogueLine[] = [
+        createTestLine('zero-priority-1', 'waveStart', 0), // Priority 0
+        createTestLine('zero-priority-2', 'waveStart', 0), // Priority 0
+      ];
+
+      const context: DialogueSelectionContext = {
+        event: 'waveStart',
+        score: 0,
+        waveState: 'countdown',
+      };
+
+      // Should not throw and should return first line
+      const selected = manager.selectDialogue('character-1', lines, context);
+      expect(selected).toBeDefined();
+      expect(selected?.id).toBe('zero-priority-1');
+    });
+
+    it('should handle negative priorities by treating them as zero', () => {
+      const lines: DialogueLine[] = [
+        createTestLine('negative-priority', 'waveStart', -5), // Negative priority
+        createTestLine('positive-priority', 'waveStart', 10), // Positive priority
+      ];
+
+      const context: DialogueSelectionContext = {
+        event: 'waveStart',
+        score: 0,
+        waveState: 'countdown',
+      };
+
+      // Should still work and prefer the positive priority line
+      const selected = manager.selectDialogue('character-1', lines, context);
+      expect(selected).toBeDefined();
+      // With seeded randomness, we can't predict which will be chosen with certainty,
+      // but it should not crash and should return one of the lines
+      expect(['negative-priority', 'positive-priority']).toContain(selected?.id);
+    });
+
     it('should handle complex nested conditions', () => {
       // Use seeded manager for deterministic testing
       const seededManager = new DialogueManager(12345);

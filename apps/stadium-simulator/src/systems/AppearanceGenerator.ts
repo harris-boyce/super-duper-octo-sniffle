@@ -13,6 +13,8 @@
  * - Performance target: < 1ms per generation
  */
 
+import { seedToNumber, seededRandom } from '@/utils/seedUtils';
+
 /**
  * Color palette configuration for a character
  */
@@ -90,7 +92,7 @@ export class AppearanceGenerator {
     const validCount = Math.max(1, Math.min(colorCount, this.COLOR_POOL.length));
 
     // Generate numeric seed from string
-    const numericSeed = this.seedToNumber(seed);
+    const numericSeed = seedToNumber(seed);
 
     // Select colors without replacement
     const selectedIndices = this.selectUniqueIndices(numericSeed, validCount, this.COLOR_POOL.length);
@@ -117,8 +119,8 @@ export class AppearanceGenerator {
    * ```
    */
   public static generateSingleColor(seed: string): string {
-    const numericSeed = this.seedToNumber(seed);
-    const index = this.seededRandom(numericSeed, 0) % this.COLOR_POOL.length;
+    const numericSeed = seedToNumber(seed);
+    const index = seededRandom(numericSeed, 0) % this.COLOR_POOL.length;
     return this.COLOR_POOL[index];
   }
 
@@ -142,7 +144,7 @@ export class AppearanceGenerator {
     let currentSeed = seed;
     for (let i = 0; i < count; i++) {
       // Generate random index
-      currentSeed = this.seededRandom(currentSeed, i);
+      currentSeed = seededRandom(currentSeed, i);
       const randomIndex = currentSeed % (max - i);
 
       // Select and remove index
@@ -151,57 +153,6 @@ export class AppearanceGenerator {
     }
 
     return selected;
-  }
-
-  /**
-   * Convert seed string to numeric value
-   * 
-   * Uses a simple hash function (djb2 algorithm) to convert string seeds
-   * into numeric values suitable for random number generation.
-   * 
-   * @param seed - Seed string
-   * @returns Numeric seed value
-   */
-  private static seedToNumber(seed: string): number {
-    let hash = 5381;
-    for (let i = 0; i < seed.length; i++) {
-      hash = ((hash << 5) + hash) + seed.charCodeAt(i);
-      hash = hash | 0; // Convert to 32-bit signed integer
-    }
-    
-    // Additional mixing to improve distribution
-    hash = hash ^ (hash >>> 16);
-    hash = Math.imul(hash, 0x85ebca6b);
-    hash = hash ^ (hash >>> 13);
-    hash = Math.imul(hash, 0xc2b2ae35);
-    hash = hash ^ (hash >>> 16);
-    
-    return Math.abs(hash);
-  }
-
-  /**
-   * Generate seeded random number
-   * 
-   * Uses Linear Congruential Generator (LCG) algorithm for deterministic
-   * random number generation.
-   * 
-   * @param seed - Numeric seed
-   * @param offset - Offset for generating different sequences from same seed
-   * @returns Random number (non-negative integer)
-   */
-  private static seededRandom(seed: number, offset: number): number {
-    // LCG parameters (same as used in glibc)
-    const a = 1103515245;
-    const c = 12345;
-    const m = 0x7fffffff; // 2^31 - 1
-
-    // Mix seed with offset better
-    let mixed = seed;
-    for (let i = 0; i <= offset; i++) {
-      mixed = ((a * mixed + c) & m) >>> 0;
-    }
-
-    return mixed;
   }
 
   /**

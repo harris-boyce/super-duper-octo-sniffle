@@ -231,8 +231,13 @@ export class DialogueManager {
    * @returns Selected dialogue line
    */
   private weightedRandomSelection(lines: DialogueLine[]): DialogueLine {
-    // Calculate total weight
-    const totalWeight = lines.reduce((sum, line) => sum + line.priority, 0);
+    // Calculate total weight (ensure non-negative priorities)
+    const totalWeight = lines.reduce((sum, line) => sum + Math.max(0, line.priority), 0);
+
+    // Handle zero-weight case (all priorities are 0 or negative)
+    if (totalWeight === 0) {
+      return lines[0];
+    }
 
     // Generate random value
     const random = this.random() * totalWeight;
@@ -240,7 +245,8 @@ export class DialogueManager {
     // Select line using cumulative distribution
     let cumulative = 0;
     for (const line of lines) {
-      cumulative += line.priority;
+      const weight = Math.max(0, line.priority);
+      cumulative += weight;
       if (random < cumulative) {
         return line;
       }
