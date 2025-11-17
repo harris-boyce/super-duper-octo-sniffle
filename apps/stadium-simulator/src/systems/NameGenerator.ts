@@ -149,12 +149,44 @@ export class NameGenerator {
     const c = 12345;
     const m = 0x7fffffff; // 2^31 - 1
 
-    // Mix seed with offset better
-    let mixed = seed;
-    for (let i = 0; i <= offset; i++) {
-      mixed = ((a * mixed + c) & m) >>> 0;
+    // Efficiently advance LCG state by offset+1 steps using exponentiation by squaring
+    // X_k = a^k * X_0 + c * (a^{k-1} + ... + a^0) mod m
+    function modPow(base: number, exp: number, mod: number): number {
+      let result = 1;
+      base = base % mod;
+      while (exp > 0) {
+        if (exp % 2 === 1) result = (result * base) % mod;
+        base = (base * base) % mod;
+        exp = Math.floor(exp / 2);
+      }
+      return result;
     }
 
+    // Geometric series sum: S = (a^k - 1) / (a - 1)
+    function geometricSum(a: number, k: number, mod: number): number {
+      if (a === 1) return k % mod;
+      // Use modular inverse for division
+      const numerator = (modPow(a, k, mod) - 1 + mod) % mod;
+      const denominator = (a - 1 + mod) % mod;
+      // Compute modular inverse of denominator
+      function modInv(x: number, mod: number): number {
+        // Extended Euclidean Algorithm
+        let [a, b, u] = [mod, x, 0], v = 1;
+        while (b !== 0) {
+          const q = Math.floor(a / b);
+          [a, b] = [b, a - q * b];
+          [u, v] = [v, u - q * v];
+        }
+        return (u + mod) % mod;
+      }
+      return (numerator * modInv(denominator, mod)) % mod;
+    }
+
+    const k = offset + 1;
+    const a_k = modPow(a, k, m);
+    const sum = geometricSum(a, k, m);
+    let mixed = (a_k * seed + c * sum) % m;
+    mixed = mixed >>> 0;
     return mixed;
   }
 
