@@ -1,5 +1,9 @@
 import Phaser from 'phaser';
 import { config } from './config';
+import { initDevPanel } from './ui/DevPanel';
+
+// Initialize dev panel (only in development mode)
+initDevPanel();
 
 // Check for demo mode parameters before creating game
 let demoMode: string | null = null;
