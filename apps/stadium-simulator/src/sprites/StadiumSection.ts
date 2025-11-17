@@ -117,61 +117,42 @@ export class StadiumSection extends Phaser.GameObjects.Container {
   }
 
   /**
-   * Calculate aggregate stats from all fans in this section
+   * @deprecated Use SectionActor.getSectionWaveBonus() instead.
+   * Calculate section bonus for individual fan wave participation.
+   * Higher happiness and attention, lower thirst = higher bonus.
    */
-  public getAggregateStats(): { happiness: number; thirst: number; attention: number } {
+  public getSectionWaveBonus(): number {
+    // Temporary delegation for backwards compatibility
+    // This will be removed once all callers use SectionActor
     const allFans = this.getFans();
     if (allFans.length === 0) {
-      return { happiness: 50, thirst: 50, attention: 50 };
+      return 0;
     }
-
     let totalHappiness = 0;
     let totalThirst = 0;
     let totalAttention = 0;
-
     for (const fan of allFans) {
       const stats = fan.getStats();
       totalHappiness += stats.happiness;
       totalThirst += stats.thirst;
       totalAttention += stats.attention;
     }
-
-    return {
-      happiness: totalHappiness / allFans.length,
-      thirst: totalThirst / allFans.length,
-      attention: totalAttention / allFans.length
-    };
+    const happiness = totalHappiness / allFans.length;
+    const thirst = totalThirst / allFans.length;
+    const attention = totalAttention / allFans.length;
+    return (happiness * 0.2 + attention * 0.2) - (thirst * 0.15);
   }
 
   /**
-   * Calculate section bonus for individual fan wave participation
-   * Higher happiness and attention, lower thirst = higher bonus
-   */
-  public getSectionWaveBonus(): number {
-    const aggregate = this.getAggregateStats();
-    // Section bonus is 20% of aggregate happiness + attention, minus 15% of thirst
-    return (aggregate.happiness * 0.2 + aggregate.attention * 0.2) - (aggregate.thirst * 0.15);
-  }
-
-  /**
-   * Update all fan stats (thirst, happiness, attention decay)
-   */
-  public updateFanStats(deltaTime: number): void {
-    const allFans = this.getFans();
-    for (const fan of allFans) {
-      fan.updateStats(deltaTime);
-    }
-  }
-
-  /**
-   * Updates intensity for all fans in this section
-   * Now uses personal thirst if no intensity provided
+   * @deprecated Use SectionActor.updateFanIntensity() instead.
+   * Temporary delegation for backwards compatibility.
    */
   public updateFanIntensity(intensity?: number): void {
+    // This is kept temporarily for any direct sprite calls
+    // StadiumScene should call SectionActor.updateFanIntensity() instead
     if (intensity !== undefined) {
       this.rows.forEach(row => row.updateFanIntensity(intensity));
     } else {
-      // Update each fan based on their personal thirst
       const allFans = this.getFans();
       for (const fan of allFans) {
         fan.setIntensity();
@@ -180,8 +161,8 @@ export class StadiumSection extends Phaser.GameObjects.Container {
   }
 
   /**
-   * Resets wave-related state on all fans before new wave calculations
-   * Clears reducedEffort flag and wave strength modifier for clean state
+   * @deprecated Use SectionActor.resetFanWaveState() instead.
+   * Temporary delegation for backwards compatibility.
    */
   public resetFanWaveState(): void {
     const allFans = this.getFans();
@@ -192,21 +173,19 @@ export class StadiumSection extends Phaser.GameObjects.Container {
   }
 
   /**
-   * Calculate participation for a specific column with peer pressure logic
-   * @param columnIndex - The column index (0-7)
-   * @param waveStrength - Current wave strength for strength modifier
-   * @returns Array of fan objects with their participation state and intensity
+   * @deprecated Use SectionActor.calculateColumnParticipation() instead.
+   * Temporary delegation for backwards compatibility.
    */
   public calculateColumnParticipation(
     columnIndex: number,
     waveStrength: number
   ): Array<{ fan: Fan; willParticipate: boolean; intensity: number }> {
+    // Temporary fallback - StadiumScene should call SectionActor method instead
     const sectionBonus = this.getSectionWaveBonus();
     const strengthModifier = (waveStrength - 50) * gameBalance.waveStrength.strengthModifier;
     const rows = this.getRows();
     const result: Array<{ fan: Fan; willParticipate: boolean; intensity: number }> = [];
 
-    // First pass: roll participation for all fans in column
     let participatingCount = 0;
     const fanStates: Array<{ fan: Fan; willParticipate: boolean }> = [];
 
@@ -218,30 +197,22 @@ export class StadiumSection extends Phaser.GameObjects.Container {
         if (!seat.isEmpty()) {
           const fan = seat.getFan();
           if (fan) {
-            // Apply wave strength modifier
             fan.setWaveStrengthModifier(strengthModifier);
-            // Roll for participation
             const willParticipate = fan.rollForWaveParticipation(sectionBonus);
             fanStates.push({ fan, willParticipate });
             if (willParticipate) {
               participatingCount++;
-            }
-            // Debug: log each fan's participation roll
-            if (typeof window !== 'undefined') {
-              console.log(`[DEBUG] Fan at row ${rowIdx} col ${columnIndex} (section ${this.sectionId}) willParticipate=${willParticipate}`);
             }
           }
         }
       }
     }
 
-    // Second pass: apply peer pressure if threshold met
     const columnSize = fanStates.length;
     const peerPressureThreshold = gameBalance.waveStrength.peerPressureThreshold;
     const participationRate = columnSize > 0 ? participatingCount / columnSize : 0;
 
     if (participationRate >= peerPressureThreshold) {
-      // This column succeeded, non-participating fans join at reduced effort
       for (const state of fanStates) {
         if (!state.willParticipate) {
           state.willParticipate = true;
@@ -250,7 +221,6 @@ export class StadiumSection extends Phaser.GameObjects.Container {
       }
     }
 
-    // Build result with intensity
     for (const state of fanStates) {
       result.push({
         fan: state.fan,
@@ -259,19 +229,12 @@ export class StadiumSection extends Phaser.GameObjects.Container {
       });
     }
 
-    // Debug: log summary for this column
-    if (typeof window !== 'undefined') {
-      console.log(`[DEBUG] Section ${this.sectionId} col ${columnIndex}: ${participatingCount}/${fanStates.length} fans participating`);
-    }
     return result;
   }
 
   /**
-   * Plays wave animation for a specific column with fan participation states
-   * @param columnIndex - The column index
-   * @param fanStates - Array of fans with participation info
-   * @param visualState - Visual state for animation ('full', 'sputter', 'death')
-   * @param waveStrength - Current wave strength (0-100) for height scaling
+   * @deprecated Use SectionActor.playColumnAnimation() instead.
+   * Temporary delegation for backwards compatibility.
    */
   public async playColumnAnimation(
     columnIndex: number,
@@ -282,42 +245,32 @@ export class StadiumSection extends Phaser.GameObjects.Container {
     const baseRowDelay = gameBalance.waveTiming.rowDelay;
     const columnPromises: Promise<void>[] = [];
 
-    // Determine animation completion time based on visual state
     let animationDuration: number;
     switch (visualState) {
       case 'sputter':
-        animationDuration = 378; // 108ms up + 270ms down
+        animationDuration = 378;
         break;
       case 'death':
-        animationDuration = 252; // 72ms up + 180ms down
+        animationDuration = 252;
         break;
       case 'full':
       default:
-        animationDuration = 420; // 120ms up + 300ms down
+        animationDuration = 420;
         break;
     }
 
-    // Get row count for proper staggering
     const rows = this.getRows();
-
-    let animCount = 0;
     for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
       const state = fanStates[rowIdx];
       if (state && state.willParticipate && state.fan) {
         const delayMs = rowIdx * baseRowDelay;
         columnPromises.push(state.fan.playWave(delayMs, state.intensity, visualState, waveStrength));
-        animCount++;
-        // Call onWaveParticipation after animation completes
         this.scene.time.delayedCall(delayMs + animationDuration, () => {
           state.fan.onWaveParticipation(state.willParticipate);
         });
       }
     }
-    if (typeof window !== 'undefined') {
-      console.log(`[DEBUG] playColumnAnimation: section ${this.sectionId} col ${columnIndex} animating ${animCount} fans`);
-    }
 
-    // Start all fans in this column (don't await - allows smooth overlapping animations)
     Promise.all(columnPromises).catch(err => {
       console.error('Error during column animation:', err);
     });

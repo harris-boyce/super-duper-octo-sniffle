@@ -2,6 +2,7 @@ import type { VendorProfile, PathSegment, PathNodeType } from '@/managers/interf
 import type { StadiumSection } from '@/sprites/StadiumSection';
 import type { Fan } from '@/sprites/Fan';
 import type { GridManager } from '@/managers/GridManager';
+import type { ActorRegistry } from '@/actors/ActorRegistry';
 import { gameBalance } from '@/config/gameBalance';
 
 /**
@@ -48,8 +49,16 @@ export interface SeatNode {
   fan?: Fan;
 }
 
+/** Ground node (open area below sections, allows diagonal movement) */
+export interface GroundNode {
+  type: 'ground';
+  x: number;
+  y: number;
+  zone: number; // Ground zone index for grouping
+}
+
 /** Union type for all navigation nodes */
-export type NavigationNode = CorridorNode | StairNode | RowEntryNode | SeatNode;
+export type NavigationNode = CorridorNode | StairNode | RowEntryNode | SeatNode | GroundNode;
 
 /**
  * Navigation graph structure
@@ -102,10 +111,12 @@ export class HybridPathResolver {
   private graph: NavigationGraph;
   private sections: StadiumSection[];
   private gridManager?: GridManager;
+  private actorRegistry?: ActorRegistry;
 
-  constructor(sections: StadiumSection[], gridManager?: GridManager) {
+  constructor(sections: StadiumSection[], gridManager?: GridManager, actorRegistry?: ActorRegistry) {
     this.sections = sections;
     this.gridManager = gridManager;
+    this.actorRegistry = actorRegistry;
     this.graph = this.buildNavigationGraph(sections);
   }
 
@@ -152,38 +163,138 @@ export class HybridPathResolver {
       });
     });
 
-    // Phase 2: Create stair nodes between adjacent sections
-    for (let i = 0; i < sections.length - 1; i++) {
-      const currentSection = sections[i];
-      const nextSection = sections[i + 1];
-      const currentBounds = currentSection.getBounds();
-      const nextBounds = nextSection.getBounds();
-      
-      // Right stair of current section (connects to left of next)
-      const rightStairId = `stair_right_${i}`;
-      nodes.set(rightStairId, {
-        type: 'stair',
-        side: 'right',
-        sectionIdx: i,
-        x: currentBounds.x + currentBounds.width,
-        y: (currentBounds.y + currentBounds.y + currentBounds.height) / 2,
+    // Phase 1.5: Create ground nodes for open area below sections
+    // Ground is the open space vendors can move diagonally through
+    const groundY = sections[0] ? sections[0].getBounds().y + sections[0].getBounds().height + 100 : 600;
+    const canvasWidth = 1024; // TODO: Get from scene/config
+    const groundNodeSpacing = 150; // Spacing between ground nodes
+    
+    // Create a grid of ground nodes across the width of the stadium
+    for (let x = 100; x < canvasWidth - 100; x += groundNodeSpacing) {
+      const groundNodeId = `ground_${Math.floor(x / groundNodeSpacing)}`;
+      nodes.set(groundNodeId, {
+        type: 'ground',
+        x,
+        y: groundY,
+        zone: 0,
       });
+    }
+    
+    // Connect ground nodes to each other (allowing diagonal movement)
+    const groundNodes = Array.from(nodes.entries()).filter(([id, node]) => node.type === 'ground');
+    groundNodes.forEach(([nodeId, node], idx) => {
+      // Connect to next ground node (horizontal)
+      if (idx < groundNodes.length - 1) {
+        const [nextId, nextNode] = groundNodes[idx + 1];
+        const distance = Math.sqrt(
+          Math.pow(nextNode.x - node.x, 2) + Math.pow(nextNode.y - node.y, 2)
+        );
+        this.addEdge(edges, nodeId, nextId, distance * 0.5); // Low cost for ground movement
+        this.addEdge(edges, nextId, nodeId, distance * 0.5);
+      }
+      
+      // Connect to diagonal neighbors for true diagonal movement
+      if (idx < groundNodes.length - 2) {
+        const [diagId, diagNode] = groundNodes[idx + 2];
+        const distance = Math.sqrt(
+          Math.pow(diagNode.x - node.x, 2) + Math.pow(diagNode.y - node.y, 2)
+        );
+        this.addEdge(edges, nodeId, diagId, distance * 0.6); // Slightly higher cost
+        this.addEdge(edges, diagId, nodeId, distance * 0.6);
+      }
+    });
+    
+    // Connect ground nodes to front corridor nodes (vertical transition from ground to corridor)
+    groundNodes.forEach(([groundId, groundNode]) => {
+      sections.forEach((section, sectionIdx) => {
+        const frontCorridorId = `corridor_front_${sectionIdx}`;
+        const frontCorridor = nodes.get(frontCorridorId);
+        if (frontCorridor && frontCorridor.type === 'corridor') {
+          const distance = Math.sqrt(
+            Math.pow(frontCorridor.x - groundNode.x, 2) + Math.pow(frontCorridor.y - groundNode.y, 2)
+          );
+          // Only connect if ground node is reasonably close to this section
+          if (distance < 300) {
+            this.addEdge(edges, groundId, frontCorridorId, distance);
+            this.addEdge(edges, frontCorridorId, groundId, distance);
+          }
+        }
+      });
+    });
 
-      // Connect stair to adjacent corridor nodes
-      const topCorridorCurrentId = `corridor_top_${i}`;
-      const topCorridorNextId = `corridor_top_${i + 1}`;
-      const frontCorridorCurrentId = `corridor_front_${i}`;
-      const frontCorridorNextId = `corridor_front_${i + 1}`;
+    // Phase 2: Create stair nodes from ActorRegistry
+    if (this.actorRegistry) {
+      const stairsActors = this.actorRegistry.getByCategory('stairs');
+      stairsActors.forEach((actor: any) => {
+        const stairData = actor.getSnapshot();
+        const stairId = `stair_${stairData.id}`;
+        
+        // Create stair node at center of stairs
+        nodes.set(stairId, {
+          type: 'stair',
+          side: 'right', // TODO: Determine from position relative to sections
+          sectionIdx: -1, // Will be determined by connections
+          x: stairData.worldBounds.x,
+          y: stairData.worldBounds.y,
+        });
 
-      // Bidirectional connections
-      this.addEdge(edges, topCorridorCurrentId, rightStairId, gameBalance.vendorMovement.stairTransitionCost);
-      this.addEdge(edges, rightStairId, topCorridorCurrentId, gameBalance.vendorMovement.stairTransitionCost);
-      this.addEdge(edges, rightStairId, topCorridorNextId, gameBalance.vendorMovement.stairTransitionCost);
-      this.addEdge(edges, topCorridorNextId, rightStairId, gameBalance.vendorMovement.stairTransitionCost);
-      this.addEdge(edges, frontCorridorCurrentId, rightStairId, gameBalance.vendorMovement.stairTransitionCost);
-      this.addEdge(edges, rightStairId, frontCorridorCurrentId, gameBalance.vendorMovement.stairTransitionCost);
-      this.addEdge(edges, rightStairId, frontCorridorNextId, gameBalance.vendorMovement.stairTransitionCost);
-      this.addEdge(edges, frontCorridorNextId, rightStairId, gameBalance.vendorMovement.stairTransitionCost);
+        // Connect stairs to adjacent sections' corridor nodes
+        // Find which sections this stairway connects
+        const [sectionA, sectionB] = stairData.connectsSections;
+        const sectionAIdx = sections.findIndex(s => s.getId() === sectionA);
+        const sectionBIdx = sections.findIndex(s => s.getId() === sectionB);
+
+        if (sectionAIdx !== -1 && sectionBIdx !== -1) {
+          const stairCost = gameBalance.vendorMovement.stairTransitionCost * 1.5; // Apply stair traversal multiplier
+          
+          // Connect to both top and front corridors of both sections
+          const topCorridorAId = `corridor_top_${sectionAIdx}`;
+          const topCorridorBId = `corridor_top_${sectionBIdx}`;
+          const frontCorridorAId = `corridor_front_${sectionAIdx}`;
+          const frontCorridorBId = `corridor_front_${sectionBIdx}`;
+
+          // Bidirectional connections
+          this.addEdge(edges, topCorridorAId, stairId, stairCost);
+          this.addEdge(edges, stairId, topCorridorAId, stairCost);
+          this.addEdge(edges, stairId, topCorridorBId, stairCost);
+          this.addEdge(edges, topCorridorBId, stairId, stairCost);
+          this.addEdge(edges, frontCorridorAId, stairId, stairCost);
+          this.addEdge(edges, stairId, frontCorridorAId, stairCost);
+          this.addEdge(edges, stairId, frontCorridorBId, stairCost);
+          this.addEdge(edges, frontCorridorBId, stairId, stairCost);
+        }
+      });
+    } else {
+      // Fallback: Create hardcoded stair nodes between adjacent sections (legacy behavior)
+      for (let i = 0; i < sections.length - 1; i++) {
+        const currentSection = sections[i];
+        const nextSection = sections[i + 1];
+        const currentBounds = currentSection.getBounds();
+        const nextBounds = nextSection.getBounds();
+        
+        const rightStairId = `stair_right_${i}`;
+        nodes.set(rightStairId, {
+          type: 'stair',
+          side: 'right',
+          sectionIdx: i,
+          x: currentBounds.x + currentBounds.width,
+          y: (currentBounds.y + currentBounds.y + currentBounds.height) / 2,
+        });
+
+        const topCorridorCurrentId = `corridor_top_${i}`;
+        const topCorridorNextId = `corridor_top_${i + 1}`;
+        const frontCorridorCurrentId = `corridor_front_${i}`;
+        const frontCorridorNextId = `corridor_front_${i + 1}`;
+
+        this.addEdge(edges, topCorridorCurrentId, rightStairId, gameBalance.vendorMovement.stairTransitionCost);
+        this.addEdge(edges, rightStairId, topCorridorCurrentId, gameBalance.vendorMovement.stairTransitionCost);
+        this.addEdge(edges, rightStairId, topCorridorNextId, gameBalance.vendorMovement.stairTransitionCost);
+        this.addEdge(edges, topCorridorNextId, rightStairId, gameBalance.vendorMovement.stairTransitionCost);
+        this.addEdge(edges, frontCorridorCurrentId, rightStairId, gameBalance.vendorMovement.stairTransitionCost);
+        this.addEdge(edges, rightStairId, frontCorridorCurrentId, gameBalance.vendorMovement.stairTransitionCost);
+        this.addEdge(edges, rightStairId, frontCorridorNextId, gameBalance.vendorMovement.stairTransitionCost);
+        this.addEdge(edges, frontCorridorNextId, rightStairId, gameBalance.vendorMovement.stairTransitionCost);
+      }
     }
 
     // Phase 3: Create row entry nodes for each section row
@@ -243,19 +354,9 @@ export class HybridPathResolver {
         this.addEdge(edges, rightEntryId, leftEntryId, rowTraverseCost);
       });
 
-      // Connect adjacent row entries vertically (within same section)
-      for (let rowIdx = 0; rowIdx < rows.length - 1; rowIdx++) {
-        const currentLeftId = `rowEntry_left_${sectionIdx}_${rowIdx}`;
-        const currentRightId = `rowEntry_right_${sectionIdx}_${rowIdx}`;
-        const nextLeftId = `rowEntry_left_${sectionIdx}_${rowIdx + 1}`;
-        const nextRightId = `rowEntry_right_${sectionIdx}_${rowIdx + 1}`;
-        
-        const verticalCost = gameBalance.vendorMovement.rowVerticalTransition || 30;
-        this.addEdge(edges, currentLeftId, nextLeftId, verticalCost);
-        this.addEdge(edges, nextLeftId, currentLeftId, verticalCost);
-        this.addEdge(edges, currentRightId, nextRightId, verticalCost);
-        this.addEdge(edges, nextRightId, currentRightId, verticalCost);
-      }
+      // NOTE: Do NOT connect row entries vertically within sections
+      // Vendors must use corridors and stairs to move between rows
+      // This enforces proper pathfinding through the stadium architecture
     });
 
     // Phase 4: Use GridManager to refine costs if available
@@ -321,8 +422,30 @@ export class HybridPathResolver {
       }];
     }
 
+    // If target is a seat, find the appropriate row entry node instead
+    let actualTargetNode = toNode;
+    if (toNode.type === 'seat') {
+      // Determine which row entry (left or right) is closer to the seat
+      const leftEntryId = `rowEntry_left_${toNode.sectionIdx}_${toNode.rowIdx}`;
+      const rightEntryId = `rowEntry_right_${toNode.sectionIdx}_${toNode.rowIdx}`;
+      
+      const leftEntry = this.graph.nodes.get(leftEntryId);
+      const rightEntry = this.graph.nodes.get(rightEntryId);
+      
+      if (leftEntry && rightEntry) {
+        // Choose the entry point on the same side as the seat (or closer)
+        const seatIsOnLeft = toNode.colIdx < 4; // Assuming ~8 seats per row, midpoint is 4
+        actualTargetNode = seatIsOnLeft ? leftEntry : rightEntry;
+      } else if (leftEntry) {
+        actualTargetNode = leftEntry;
+      } else if (rightEntry) {
+        actualTargetNode = rightEntry;
+      }
+      // If neither entry exists, fall back to original seat node (will fail gracefully)
+    }
+
     // Find node ID for target
-    const targetNodeId = this.getNodeId(toNode);
+    const targetNodeId = this.getNodeId(actualTargetNode);
     const startNodeId = this.getNodeId(startNode);
 
     // Run Dijkstra's algorithm
@@ -331,11 +454,29 @@ export class HybridPathResolver {
     // Convert node path to PathSegment array
     const segments: PathSegment[] = [];
     
-    // Add initial segment from current position to first node
+    // Add initial segment(s) from current position to first node
+    // If vendor is above ground level, add vertical descent first to avoid crossing rows
     if (nodePath.length > 0) {
       const firstNode = this.graph.nodes.get(nodePath[0]);
       if (firstNode) {
-        segments.push(this.nodeToSegment(firstNode, this.calculateDistance(fromX, fromY, firstNode.x, firstNode.y)));
+        const GROUND_Y = 650; // Ground level Y coordinate
+        
+        // If vendor is significantly above ground and first node is ground type
+        if (fromY < GROUND_Y - 10 && firstNode.nodeType === 'ground') {
+          // Add intermediate waypoint: move vertically to ground level first
+          segments.push({
+            nodeType: 'ground',
+            sectionIdx: 0,
+            rowIdx: 0,
+            colIdx: 0,
+            x: fromX, // Keep same X, only change Y
+            y: GROUND_Y,
+            cost: Math.abs(GROUND_Y - fromY),
+          });
+        }
+        
+        // Then add segment to first node
+        segments.push(this.nodeToSegment(firstNode, this.calculateDistance(segments.length > 0 ? fromX : fromX, segments.length > 0 ? GROUND_Y : fromY, firstNode.x, firstNode.y)));
       }
     }
 
@@ -346,6 +487,22 @@ export class HybridPathResolver {
       if (currentNode && nextNode) {
         const cost = this.calculateDistance(currentNode.x, currentNode.y, nextNode.x, nextNode.y);
         segments.push(this.nodeToSegment(nextNode, cost));
+      }
+    }
+
+    // If original target was a seat (not a row entry), add final segment from row entry to seat
+    if (toNode.type === 'seat' && actualTargetNode.type === 'rowEntry') {
+      const lastNode = nodePath.length > 0 ? this.graph.nodes.get(nodePath[nodePath.length - 1]) : null;
+      if (lastNode) {
+        segments.push({
+          nodeType: 'seat',
+          sectionIdx: toNode.sectionIdx,
+          rowIdx: toNode.rowIdx,
+          colIdx: toNode.colIdx,
+          x: toNode.x,
+          y: toNode.y,
+          cost: this.calculateDistance(lastNode.x, lastNode.y, toNode.x, toNode.y),
+        });
       }
     }
 
@@ -466,14 +623,16 @@ export class HybridPathResolver {
   private nodeToSegment(node: NavigationNode, cost: number): PathSegment {
     const nodeType: PathNodeType = node.type === 'rowEntry' ? 'rowEntry' : 
                                     node.type === 'stair' ? 'stair' :
-                                    node.type === 'corridor' ? 'corridor' : 'seat';
+                                    node.type === 'corridor' ? 'corridor' :
+                                    node.type === 'ground' ? 'ground' : 'seat';
     
     const colIdx = 'colIdx' in node ? node.colIdx : 0;
-    const rowIdx = node.type === 'rowEntry' || node.type === 'seat' ? node.rowIdx : 0;
+    const rowIdx = (node.type === 'rowEntry' || node.type === 'seat') ? node.rowIdx : 0;
+    const sectionIdx = 'sectionIdx' in node ? node.sectionIdx : 0;
     
     return {
       nodeType,
-      sectionIdx: node.sectionIdx,
+      sectionIdx,
       rowIdx,
       colIdx,
       x: node.x,

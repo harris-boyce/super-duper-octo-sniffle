@@ -64,7 +64,7 @@ export type VendorState =
 /**
  * Path segment node type
  */
-export type PathNodeType = 'corridor' | 'stair' | 'rowEntry' | 'seat';
+export type PathNodeType = 'corridor' | 'stair' | 'rowEntry' | 'seat' | 'ground';
 
 /**
  * Path segment for vendor navigation

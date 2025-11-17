@@ -4,12 +4,16 @@ import { WaveManager } from '@/managers/WaveManager';
 import { AIManager } from '@/managers/AIManager';
 import { StadiumSection } from '@/sprites/StadiumSection';
 import { Vendor } from '@/sprites/Vendor';
+import { VendorState } from '@/managers/interfaces';
 import { AnnouncerService } from '@/managers/AnnouncerService';
 
 import { gameBalance } from '@/config/gameBalance';
 import { ActorRegistry } from '@/actors/ActorRegistry';
 import { ActorFactory } from '@/actors/ActorFactory';
 import { SectionActor } from '@/actors/adapters/SectionActor';
+import { StairsActor } from '@/actors/adapters/StairsActor';
+import { GroundActor } from '@/actors/adapters/GroundActor';
+import { SkyboxActor } from '@/actors/adapters/SkyboxActor';
 import { FanActor } from '@/actors/adapters/FanActor';
 import { GridManager } from '@/managers/GridManager';
 import { LevelService } from '@/services/LevelService';
@@ -70,12 +74,46 @@ export class StadiumScene extends Phaser.Scene {
     // Attach actorRegistry to the scene instance for WaveManager access
     (this as any).actorRegistry = this.actorRegistry;
 
+    // Create visual environment (ground and skybox) before sections
+    const canvasWidth = this.cameras.main.width;
+    const canvasHeight = this.cameras.main.height;
+
+    const gridHeight = gameBalance.grid.cellSize * gameBalance.grid.groundLine.rowsFromBottom;
+    const groundLineY = canvasHeight - gridHeight;
+
+    // const groundLineY = gameBalance.grid.groundLine.enabled ? gameBalance.grid.groundLine.rowsFromBottom * canvasHeight : canvasHeight * 0.6; // Ground starts at 60% down the canvas
+    
+    canvasHeight * 0.6; // Ground starts at 60% down the canvas
+
+    // Create skybox
+    const skyboxActor = new SkyboxActor({
+      id: ActorFactory.generateId('skybox', 'main'),
+      scene: this,
+      groundLineY,
+      width: canvasWidth,
+      topColor: gameBalance.visual.skyTopColor,
+      bottomColor: gameBalance.visual.skyBottomColor
+    });
+    this.actorRegistry.register(skyboxActor);
+
+    // Create ground
+    const groundHeight = canvasHeight - groundLineY;
+    const groundActor = new GroundActor({
+      id: ActorFactory.generateId('ground', 'main'),
+      scene: this,
+      groundLineY,
+      width: canvasWidth,
+      height: groundHeight,
+      color: gameBalance.visual.groundColor
+    });
+    this.actorRegistry.register(groundActor);
+
     // Initialize GameStateManager with level sections
     this.gameState.initializeSections(levelData.sections);
     this.gameState.startSession();
 
     // Initialize AIManager
-    this.aiManager = new AIManager(this.gameState, 2, this.gridManager);
+    this.aiManager = new AIManager(this.gameState, 2, this.gridManager, this.actorRegistry);
 
     // Create SectionActors from level data (Actor-first, data-driven!)
     const sectionActors: SectionActor[] = [];
@@ -95,14 +133,82 @@ export class StadiumScene extends Phaser.Scene {
       this.sections.push(sectionActor.getSection());
     });
 
+    // Create StairsActors from level data
+    if (levelData.stairs && this.gridManager) {
+      levelData.stairs.forEach((stairData) => {
+        const actorId = ActorFactory.generateId('stairs', stairData.id);
+        // Calculate world bounds from grid bounds
+        const topLeft = this.gridManager!.gridToWorld(stairData.gridTop, stairData.gridLeft);
+        const bottomRight = this.gridManager!.gridToWorld(
+          stairData.gridTop + stairData.height - 1,
+          stairData.gridLeft + stairData.width - 1
+        );
+        const cellSize = this.gridManager!.getWorldSize().cellSize;
+        const worldBounds = {
+          x: (topLeft.x + bottomRight.x) / 2,
+          y: (topLeft.y + bottomRight.y) / 2,
+          width: stairData.width * cellSize,
+          height: stairData.height * cellSize
+        };
+        
+        const stairsActor = new StairsActor({
+          id: actorId,
+          gridBounds: {
+            left: stairData.gridLeft,
+            top: stairData.gridTop,
+            width: stairData.width,
+            height: stairData.height
+          },
+          connectsSections: stairData.connectsSections,
+          worldBounds,
+          scene: this
+        });
+        
+        this.actorRegistry.register(stairsActor);
+        
+        // Mark stair cells as passable in grid (Phase 2.2 - Option A)
+        // Stairs are passable for pathfinding (don't mark as occupied)
+        // GridManager.addOccupant marks cells as occupied, so we skip that for stairs
+      });
+    }
+
     // Initialize AIManager with sections for pathfinding
     this.aiManager.initializeSections(this.sections);
 
     // Listen to vendor events BEFORE spawning (important!)
     this.setupVendorEventListeners();
 
-    // Spawn initial vendors (2 good-quality drink vendors by default)
-    this.aiManager.spawnInitialVendors();
+    // Spawn vendors at positions from level data
+    if (levelData.vendors && this.gridManager) {
+      levelData.vendors.forEach((vendorData, idx) => {
+        const profile = this.aiManager.createVendor(vendorData.type as any, 'good');
+        const worldPos = this.gridManager!.gridToWorld(vendorData.gridRow, vendorData.gridCol);
+        console.log(`[Vendor Init] Vendor ${profile.id} at grid (${vendorData.gridRow}, ${vendorData.gridCol}) -> world (${worldPos.x}, ${worldPos.y})`);
+        
+        const instance = {
+          profile,
+          state: 'idle' as VendorState,
+          position: { x: worldPos.x, y: worldPos.y },
+          currentSegmentIndex: 0,
+          scanTimer: 0,
+          stateTimer: 0,
+          distractionCheckTimer: 0,
+          attentionAuraActive: false,
+          lastServiceTime: 0,
+        };
+        this.aiManager.getVendorInstances().set(profile.id, instance);
+        
+        // Directly create vendor sprite for initialization (no need for event)
+        const vendorSprite = new Vendor(this, worldPos.x, worldPos.y);
+        vendorSprite.setDepth(1000); // Render above fans
+        this.add.existing(vendorSprite);
+        this.vendorSprites.set(profile.id, vendorSprite);
+        console.log(`[Vendor Init] Created sprite for vendor ${profile.id}, total sprites: ${this.vendorSprites.size}`);
+      });
+      
+      // Rebuild vendor controls to show buttons immediately
+      this.rebuildVendorControls();
+    }
 
     // Initialize WaveManager (no longer needs SeatManager)
     this.waveManager = new WaveManager(this.gameState, this.aiManager, this.gridManager, this.actorRegistry);
@@ -241,13 +347,15 @@ export class StadiumScene extends Phaser.Scene {
     });
 
     // Setup vendor button listeners
-    levelData.sections.forEach(sectionData => {
+    levelData.sections.forEach((sectionData, sectionIdx) => {
       const section = sectionData.id.toLowerCase();
       document.getElementById(`v1-${section}`)?.addEventListener('click', () => {
-        this.aiManager.placeVendor(0, sectionData.id);
+        this.aiManager.assignVendorToSection(0, sectionIdx);
+        console.log(`[UI] Assigned vendor 0 to section ${sectionData.id} (index ${sectionIdx})`);
       });
       document.getElementById(`v2-${section}`)?.addEventListener('click', () => {
-        this.aiManager.placeVendor(1, sectionData.id);
+        this.aiManager.assignVendorToSection(1, sectionIdx);
+        console.log(`[UI] Assigned vendor 1 to section ${sectionData.id} (index ${sectionIdx})`);
       });
     });
 
@@ -479,16 +587,18 @@ export class StadiumScene extends Phaser.Scene {
     // Update fan stats (thirst decay, happiness, attention)
     // Only update stats when session is actually active (not during countdown)
     if (!this.demoMode && this.gameState.getSessionState() === 'active') {
-      this.sections.forEach(section => {
-        section.updateFanStats(delta);
+      // Get section actors from registry and update their fan stats
+      const sectionActors = this.actorRegistry.getByCategory('section');
+      sectionActors.forEach(actor => {
+        (actor as any).updateFanStats(delta);
       });
 
       // Sync section-level stats from fan aggregates for UI display
       if (this.levelData) {
         this.levelData.sections.forEach((sectionData: any, idx: number) => {
-          const section = this.sections[idx];
-          if (!section) return;
-          const aggregate = section.getAggregateStats();
+          const sectionActor = sectionActors[idx];
+          if (!sectionActor) return;
+          const aggregate = (sectionActor as any).getAggregateStats();
           
           // Update GameStateManager with aggregate values for UI display
           this.gameState.updateSectionStat(sectionData.id, 'happiness', aggregate.happiness);
@@ -497,6 +607,9 @@ export class StadiumScene extends Phaser.Scene {
         });
       }
     }
+
+    // Update actor registry (for autonomous actor behaviors)
+    this.actorRegistry.update(delta);
 
     // Update vendor manager
     this.aiManager.update(delta);
@@ -1100,34 +1213,17 @@ export class StadiumScene extends Phaser.Scene {
       console.log(`[Vendor] Spawned vendor ${data.vendorId}`);
       const { vendorId, profile } = data;
       
-      // Position vendors spread out near sections (equidistant from center)
-      const vendorCount = this.vendorSprites.size;
-      const spacing = 250; // pixels between vendors
-      const startX = this.cameras.main.centerX - (spacing / 2) + (vendorCount * spacing);
-      const startY = 550; // front corridor area
-      
-      // Create vendor visual sprite
+      // Use vendor instance position (set from gridManager.gridToWorld)
+      const instance = this.aiManager.getVendorInstance(vendorId);
+      const startX = instance?.position.x ?? this.cameras.main.centerX;
+      const startY = instance?.position.y ?? 550;
       const vendorSprite = new Vendor(this, startX, startY);
       vendorSprite.setDepth(1000); // Render above fans
       console.log(`[Vendor] Sprite created at (${startX}, ${startY})`);
-      
-      // Store reference
       this.vendorSprites.set(vendorId, vendorSprite);
       console.log(`[Vendor] Total sprites: ${this.vendorSprites.size}`);
-      
-      // Add sprite to scene
       this.add.existing(vendorSprite);
-      
-      // Update vendor instance position in manager
-      const instance = this.aiManager.getVendorInstance(vendorId);
-      if (instance) {
-        instance.position.x = startX;
-        instance.position.y = startY;
-      }
-      
       console.log(`[Vendor] Profile type=${profile.type} quality=${profile.qualityTier}`);
-
-      // Rebuild vendor controls dynamically
       this.rebuildVendorControls();
     });
 
@@ -1159,28 +1255,10 @@ export class StadiumScene extends Phaser.Scene {
       // Update UI highlight
       this.rebuildVendorControls();
     });
-
-    // Scan attempt events
-    this.aiManager.on('vendorScanAttempt', (data: { vendorId: number; assignedSectionIdx?: number }) => {
-      const sec = data.assignedSectionIdx !== undefined && this.levelData 
-        ? this.levelData.sections[data.assignedSectionIdx]?.id || 'ALL'
-        : 'ALL';
-      console.log(`[Vendor] Vendor ${data.vendorId} scanning (scope=${sec})`);
-    });
-    this.aiManager.on('vendorTargetSelected', (data: { vendorId: number; sectionIdx: number; rowIdx: number; colIdx: number }) => {
-      const sectionId = this.levelData?.sections[data.sectionIdx]?.id || 'Unknown';
-      console.log(`[Vendor] Vendor ${data.vendorId} target selected S=${sectionId} R=${data.rowIdx} C=${data.colIdx}`);
-    });
-    this.aiManager.on('vendorNoTarget', (data: { vendorId: number; assignedSectionIdx?: number }) => {
-      const sec = data.assignedSectionIdx !== undefined && this.levelData
-        ? this.levelData.sections[data.assignedSectionIdx]?.id || 'ALL'
-        : 'ALL';
-      console.log(`[Vendor] Vendor ${data.vendorId} no target found (scope=${sec})`);
-    });
   }
 
   /**
-   * Update vendor visual positions based on manager state
+   * Update vendor sprite positions to match their instance positions
    */
   private updateVendorPositions(): void {
     for (const [vendorId, sprite] of this.vendorSprites) {
