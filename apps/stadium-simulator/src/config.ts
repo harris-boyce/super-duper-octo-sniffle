@@ -4,8 +4,6 @@ import { WorldScene } from './scenes/WorldScene';
 import { StadiumScene } from './scenes/StadiumScene';
 import { ScoreReportScene } from './scenes/ScoreReportScene';
 import { GameOverScene } from './scenes/GameOverScene';
-import { TestSectionScene } from './scenes/TestSectionScene';
-import { TestSectionDebugScene } from './scenes/TestSectionDebugScene';
 import { SpeechBubbleDemoScene } from './scenes/SpeechBubbleDemoScene';
 import { GridOverlay } from './scenes/GridOverlay';
 
@@ -17,7 +15,7 @@ try {
   const demoMode = url.searchParams.get('demo');
   
   if (demoMode === 'debug') {
-    scenes = [TestSectionDebugScene];
+    scenes = [GridOverlay];
   } else if (demoMode === 'speech') {
     scenes = [SpeechBubbleDemoScene];
   }
