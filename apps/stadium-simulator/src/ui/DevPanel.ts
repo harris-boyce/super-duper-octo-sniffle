@@ -14,7 +14,7 @@
  */
 
 import { AIContentManager } from '@/systems/AIContentManager';
-import type { GameAIContent, ContentMetadata } from '@/types/personalities';
+import type { GameAIContent, ContentMetadata, VendorPersonality, MascotPersonality, AnnouncerContent, PersonalityTrait } from '@/managers/interfaces/personalities';
 import { getCurrentEpoch } from '@/config/ai-config';
 
 /**
@@ -259,13 +259,13 @@ export class DevPanel {
             <strong>Vendors (${this.currentContent.vendors.length})</strong>
           </div>
           <div id="vendors-list" data-visible="false" style="display: none; padding-left: 16px; margin-top: 4px;">
-            ${this.currentContent.vendors.map((v) => `
+            ${this.currentContent.vendors.map((v: VendorPersonality) => `
               <div style="margin-bottom: 8px; padding: 6px; background: rgba(0, 0, 0, 0.3); border-left: 2px solid #9b59b6; border-radius: 2px;">
                 <div><strong>${v.name}</strong></div>
                 <div style="font-size: 10px; color: #aaa;">${v.description}</div>
                 <div style="font-size: 10px;"><strong>Product:</strong> ${v.productType}</div>
                 <div style="font-size: 10px;"><strong>Dialogue Lines:</strong> ${v.dialogue.length}</div>
-                <div style="font-size: 10px;"><strong>Traits:</strong> ${v.traits.map(t => t.name).join(', ')}</div>
+                <div style="font-size: 10px;"><strong>Traits:</strong> ${v.traits.map((t: PersonalityTrait) => t.name).join(', ')}</div>
               </div>
             `).join('')}
           </div>
@@ -278,7 +278,7 @@ export class DevPanel {
             <strong>Mascots (${this.currentContent.mascots.length})</strong>
           </div>
           <div id="mascots-list" data-visible="false" style="display: none; padding-left: 16px; margin-top: 4px;">
-            ${this.currentContent.mascots.map((m) => `
+            ${this.currentContent.mascots.map((m: MascotPersonality) => `
               <div style="margin-bottom: 8px; padding: 6px; background: rgba(0, 0, 0, 0.3); border-left: 2px solid #9b59b6; border-radius: 2px;">
                 <div><strong>${m.name}</strong></div>
                 <div style="font-size: 10px; color: #aaa;">${m.description}</div>
@@ -297,7 +297,7 @@ export class DevPanel {
             <strong>Announcers (${this.currentContent.announcers.length})</strong>
           </div>
           <div id="announcers-list" data-visible="false" style="display: none; padding-left: 16px; margin-top: 4px;">
-            ${this.currentContent.announcers.map((a) => `
+            ${this.currentContent.announcers.map((a: AnnouncerContent) => `
               <div style="margin-bottom: 8px; padding: 6px; background: rgba(0, 0, 0, 0.3); border-left: 2px solid #9b59b6; border-radius: 2px;">
                 <div><strong>${a.name}</strong></div>
                 <div style="font-size: 10px; color: #aaa;">${a.description}</div>

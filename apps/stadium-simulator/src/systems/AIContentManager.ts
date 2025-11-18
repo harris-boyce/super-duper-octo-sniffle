@@ -18,7 +18,7 @@ import type {
   ContentCacheEntry,
   ContentMetadata,
   ContentSetMetadata,
-} from '@/types/personalities';
+} from '@/managers/interfaces/personalities';
 import { getCurrentEpoch, type Environment } from '@/config/ai-config';
 
 /**

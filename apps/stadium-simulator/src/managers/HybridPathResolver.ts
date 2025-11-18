@@ -346,12 +346,18 @@ export class HybridPathResolver {
         const nextBounds = nextSection.getBounds();
         
         const rightStairId = `stair_right_${i}`;
+        const stairX = currentBounds.x + currentBounds.width;
+        const stairY = (currentBounds.y + currentBounds.y + currentBounds.height) / 2;
+        const stairGrid = this.worldToGrid(stairX, stairY);
+        
         nodes.set(rightStairId, {
           type: 'stair',
           side: 'right',
           sectionIdx: i,
-          x: currentBounds.x + currentBounds.width,
-          y: (currentBounds.y + currentBounds.y + currentBounds.height) / 2,
+          gridRow: stairGrid?.row || 0,
+          gridCol: stairGrid?.col || 0,
+          x: stairX,
+          y: stairY,
         });
 
         const topCorridorCurrentId = `corridor_top_${i}`;
@@ -560,7 +566,7 @@ export class HybridPathResolver {
         const GROUND_Y = 650; // Ground level Y coordinate
         
         // If vendor is significantly above ground and first node is ground type
-        if (fromY < GROUND_Y - 10 && firstNode.nodeType === 'ground') {
+        if (fromY < GROUND_Y - 10 && firstNode.type === 'ground') {
           // Add intermediate waypoint: move vertically to ground level first
           segments.push({
             nodeType: 'ground',
@@ -597,7 +603,7 @@ export class HybridPathResolver {
     console.log(`[HybridPathResolver] Total path segments: ${segments.length}`);
     if (segments.length > 0) {
       console.log('[HybridPathResolver] Segment details:', segments.map((s, i) => 
-        `${i}: ${s.nodeType} (${s.gridRow || '?'},${s.gridCol || '?'}) @ (${Math.round(s.x)},${Math.round(s.y)})`
+        `${i}: ${s.nodeType} (row:${s.rowIdx ?? '?'}, col:${s.colIdx ?? '?'}) @ (${Math.round(s.x)},${Math.round(s.y)})`
       ).join('\n  '));
     }
 
@@ -732,6 +738,8 @@ export class HybridPathResolver {
         return `rowEntry_${node.colIdx === 0 ? 'left' : 'right'}_${node.sectionIdx}_${node.rowIdx}`;
       case 'seat':
         return `seat_${node.sectionIdx}_${node.rowIdx}_${node.colIdx}`;
+      case 'ground':
+        return `ground_${node.zone}_${node.gridRow}_${node.gridCol}`;
     }
   }
 
@@ -772,8 +780,6 @@ export class HybridPathResolver {
           sectionIdx: 'sectionIdx' in fromNode ? fromNode.sectionIdx : 0,
           rowIdx: currentRow,
           colIdx: col,
-          gridRow: currentRow,
-          gridCol: col,
           x: worldPos.x,
           y: worldPos.y,
           cost: this.gridManager.getWorldSize().cellSize,
@@ -791,8 +797,6 @@ export class HybridPathResolver {
           sectionIdx: 'sectionIdx' in toNode ? toNode.sectionIdx : 0,
           rowIdx: row,
           colIdx: targetCol,
-          gridRow: row,
-          gridCol: targetCol,
           x: worldPos.x,
           y: worldPos.y,
           cost: this.gridManager.getWorldSize().cellSize,
@@ -853,11 +857,12 @@ export class HybridPathResolver {
     let cost = segment.cost; // base distance cost
 
     // Apply node type base speed modifier
-    const speedModifiers = {
+    const speedModifiers: Record<PathNodeType, number> = {
       corridor: gameBalance.vendorMovement.baseSpeedCorridor,
       stair: gameBalance.vendorMovement.baseSpeedStair,
       rowEntry: gameBalance.vendorMovement.baseSpeedRow,
       seat: gameBalance.vendorMovement.baseSpeedRow,
+      ground: gameBalance.vendorMovement.baseSpeedCorridor,
     };
 
     cost = cost / speedModifiers[segment.nodeType];

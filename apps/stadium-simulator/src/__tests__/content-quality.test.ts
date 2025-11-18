@@ -21,7 +21,7 @@ import type {
   AnnouncerContent,
   DialogueLine,
   PersonalityTrait,
-} from '@/types/personalities';
+} from '@/managers/interfaces/personalities';
 
 describe('Content Quality Tests', () => {
   let contentManager: AIContentManager;
@@ -76,7 +76,7 @@ describe('Content Quality Tests', () => {
         return;
       }
 
-      staticContent.vendors.forEach((vendor, index) => {
+      staticContent.vendors.forEach((vendor: VendorPersonality, index: number) => {
         // Required fields
         expect(vendor.id, `Vendor ${index} missing id`).toBeTruthy();
         expect(vendor.name, `Vendor ${index} missing name`).toBeTruthy();
@@ -108,7 +108,7 @@ describe('Content Quality Tests', () => {
         return;
       }
 
-      staticContent.mascots.forEach((mascot, index) => {
+      staticContent.mascots.forEach((mascot: MascotPersonality, index: number) => {
         // Required fields
         expect(mascot.id, `Mascot ${index} missing id`).toBeTruthy();
         expect(mascot.name, `Mascot ${index} missing name`).toBeTruthy();
@@ -137,7 +137,7 @@ describe('Content Quality Tests', () => {
         return;
       }
 
-      staticContent.announcers.forEach((announcer, index) => {
+      staticContent.announcers.forEach((announcer: AnnouncerContent, index: number) => {
         // Required fields
         expect(announcer.id, `Announcer ${index} missing id`).toBeTruthy();
         expect(announcer.name, `Announcer ${index} missing name`).toBeTruthy();
@@ -183,8 +183,8 @@ describe('Content Quality Tests', () => {
         ...staticContent.announcers,
       ];
 
-      allPersonalities.forEach((personality, index) => {
-        personality.traits.forEach((trait, traitIndex) => {
+      allPersonalities.forEach((personality, index: number) => {
+        personality.traits.forEach((trait: PersonalityTrait, traitIndex: number) => {
           expect(trait.id, `Personality ${index} trait ${traitIndex} missing id`).toBeTruthy();
           expect(trait.name, `Personality ${index} trait ${traitIndex} missing name`).toBeTruthy();
           expect(trait.description, `Personality ${index} trait ${traitIndex} missing description`).toBeTruthy();
@@ -208,7 +208,7 @@ describe('Content Quality Tests', () => {
       ];
 
       allPersonalities.forEach((personality) => {
-        personality.traits.forEach((trait) => {
+        personality.traits.forEach((trait: PersonalityTrait) => {
           // Description should be at least somewhat descriptive
           expect(trait.description.length).toBeGreaterThan(10);
           
@@ -225,9 +225,9 @@ describe('Content Quality Tests', () => {
       }
 
       const allTraits: PersonalityTrait[] = [
-        ...staticContent.vendors.flatMap(v => v.traits),
-        ...staticContent.mascots.flatMap(m => m.traits),
-        ...staticContent.announcers.flatMap(a => a.traits),
+        ...staticContent.vendors.flatMap((v: VendorPersonality) => v.traits),
+        ...staticContent.mascots.flatMap((m: MascotPersonality) => m.traits),
+        ...staticContent.announcers.flatMap((a: AnnouncerContent) => a.traits),
       ];
 
       const intensities = allTraits.map(t => t.intensity);
@@ -254,7 +254,7 @@ describe('Content Quality Tests', () => {
         ...staticContent.announcers.flatMap(a => a.commentary),
       ];
 
-      allDialogue.forEach((line, index) => {
+      allDialogue.forEach((line: DialogueLine, index: number) => {
         expect(line.id, `Dialogue ${index} missing id`).toBeTruthy();
         expect(line.text, `Dialogue ${index} missing text`).toBeTruthy();
         expect(line.context, `Dialogue ${index} missing context`).toBeDefined();
@@ -271,12 +271,12 @@ describe('Content Quality Tests', () => {
       }
 
       const allDialogue: DialogueLine[] = [
-        ...staticContent.vendors.flatMap(v => v.dialogue),
-        ...staticContent.mascots.flatMap(m => m.dialogue),
-        ...staticContent.announcers.flatMap(a => a.commentary),
+        ...staticContent.vendors.flatMap((v: VendorPersonality) => v.dialogue),
+        ...staticContent.mascots.flatMap((m: MascotPersonality) => m.dialogue),
+        ...staticContent.announcers.flatMap((a: AnnouncerContent) => a.commentary),
       ];
 
-      allDialogue.forEach((line) => {
+      allDialogue.forEach((line: DialogueLine, index: number) => {
         // Dialogue should not be empty or just whitespace
         expect(line.text.trim().length).toBeGreaterThan(0);
         
@@ -295,22 +295,22 @@ describe('Content Quality Tests', () => {
       }
 
       // Vendor dialogue should use vendor events
-      staticContent.vendors.forEach((vendor) => {
-        vendor.dialogue.forEach((line) => {
+      staticContent.vendors.forEach((vendor: VendorPersonality) => {
+        vendor.dialogue.forEach((line: DialogueLine) => {
           expect(['vendorServe', 'waveComplete', 'sectionSuccess', 'sectionFail', 'fanHappy', 'fanThirsty']).toContain(line.context.event);
         });
       });
 
       // Mascot dialogue should use mascot events
-      staticContent.mascots.forEach((mascot) => {
-        mascot.dialogue.forEach((line) => {
+      staticContent.mascots.forEach((mascot: MascotPersonality) => {
+        mascot.dialogue.forEach((line: DialogueLine) => {
           expect(['mascotActivate', 'waveComplete', 'sectionSuccess', 'sectionFail', 'highScore']).toContain(line.context.event);
         });
       });
 
       // Announcer commentary should use announcer events
-      staticContent.announcers.forEach((announcer) => {
-        announcer.commentary.forEach((line) => {
+      staticContent.announcers.forEach((announcer: AnnouncerContent) => {
+        announcer.commentary.forEach((line: DialogueLine) => {
           expect(['waveStart', 'waveComplete', 'sectionSuccess', 'sectionFail', 'sessionStart', 'sessionEnd', 'highScore', 'lowScore']).toContain(line.context.event);
         });
       });
@@ -323,12 +323,12 @@ describe('Content Quality Tests', () => {
       }
 
       const allDialogue: DialogueLine[] = [
-        ...staticContent.vendors.flatMap(v => v.dialogue),
-        ...staticContent.mascots.flatMap(m => m.dialogue),
-        ...staticContent.announcers.flatMap(a => a.commentary),
+        ...staticContent.vendors.flatMap((v: VendorPersonality) => v.dialogue),
+        ...staticContent.mascots.flatMap((m: MascotPersonality) => m.dialogue),
+        ...staticContent.announcers.flatMap((a: AnnouncerContent) => a.commentary),
       ];
 
-      allDialogue.forEach((line) => {
+      allDialogue.forEach((line: DialogueLine) => {
         // Cooldowns should be reasonable (not negative, not years)
         expect(line.cooldown).toBeGreaterThanOrEqual(0);
         expect(line.cooldown).toBeLessThan(60000); // Less than 1 minute
@@ -370,12 +370,12 @@ describe('Content Quality Tests', () => {
       ];
 
       const allDialogue: DialogueLine[] = [
-        ...staticContent.vendors.flatMap(v => v.dialogue),
-        ...staticContent.mascots.flatMap(m => m.dialogue),
-        ...staticContent.announcers.flatMap(a => a.commentary),
+        ...staticContent.vendors.flatMap((v: VendorPersonality) => v.dialogue),
+        ...staticContent.mascots.flatMap((m: MascotPersonality) => m.dialogue),
+        ...staticContent.announcers.flatMap((a: AnnouncerContent) => a.commentary),
       ];
 
-      allDialogue.forEach((line) => {
+      allDialogue.forEach((line: DialogueLine) => {
         expect(validEmotions).toContain(line.emotion);
       });
 
@@ -396,11 +396,11 @@ describe('Content Quality Tests', () => {
         return;
       }
 
-      staticContent.vendors.forEach((vendor) => {
+      staticContent.vendors.forEach((vendor: VendorPersonality) => {
         // Vendor dialogue should generally be friendly/service-oriented
         const serviceWords = ['here', 'get', 'fresh', 'hot', 'cold', 'drinks', 'snacks', 'food'];
         
-        const dialogueWithServiceWords = vendor.dialogue.filter(line =>
+        const dialogueWithServiceWords = vendor.dialogue.filter((line: DialogueLine) =>
           serviceWords.some(word => line.text.toLowerCase().includes(word))
         );
 
@@ -415,9 +415,9 @@ describe('Content Quality Tests', () => {
         return;
       }
 
-      staticContent.mascots.forEach((mascot) => {
+      staticContent.mascots.forEach((mascot: MascotPersonality) => {
         // Mascots should have energetic traits
-        const hasEnergeticTrait = mascot.traits.some(trait =>
+        const hasEnergeticTrait = mascot.traits.some((trait: PersonalityTrait) =>
           trait.name.toLowerCase().includes('energetic') ||
           trait.name.toLowerCase().includes('enthusiastic') ||
           trait.intensity > 0.7
@@ -433,7 +433,7 @@ describe('Content Quality Tests', () => {
         return;
       }
 
-      staticContent.announcers.forEach((announcer) => {
+      staticContent.announcers.forEach((announcer: AnnouncerContent) => {
         // Announcers should have catchphrases
         expect(announcer.catchphrases.length).toBeGreaterThan(0);
 
@@ -450,33 +450,33 @@ describe('Content Quality Tests', () => {
       }
 
       const allText = [
-        ...staticContent.vendors.flatMap(v => [
+        ...staticContent.vendors.flatMap((v: VendorPersonality) => [
           v.name,
           v.description,
-          ...v.dialogue.map(d => d.text),
-          ...v.traits.map(t => t.description),
+          ...v.dialogue.map((d: DialogueLine) => d.text),
+          ...v.traits.map((t: PersonalityTrait) => t.description),
         ]),
-        ...staticContent.mascots.flatMap(m => [
+        ...staticContent.mascots.flatMap((m: MascotPersonality) => [
           m.name,
           m.description,
-          ...m.dialogue.map(d => d.text),
-          ...m.traits.map(t => t.description),
+          ...m.dialogue.map((d: DialogueLine) => d.text),
+          ...m.traits.map((t: PersonalityTrait) => t.description),
         ]),
-        ...staticContent.announcers.flatMap(a => [
+        ...staticContent.announcers.flatMap((a: AnnouncerContent) => [
           a.name,
           a.description,
-          ...a.commentary.map(d => d.text),
-          ...a.catchphrases.map(c => c.text),
-          ...a.traits.map(t => t.description),
+          ...a.commentary.map((d: DialogueLine) => d.text),
+          ...a.catchphrases.map((c: any) => c.text),
+          ...a.traits.map((t: PersonalityTrait) => t.description),
         ]),
       ];
 
       // Check for inappropriate content (basic check)
       const inappropriateWords = ['damn', 'hell', 'crap', 'stupid', 'dumb', 'hate'];
       
-      allText.forEach((text) => {
+      allText.forEach((text: string) => {
         const lowerText = text.toLowerCase();
-        inappropriateWords.forEach((word) => {
+        inappropriateWords.forEach((word: string) => {
           expect(lowerText).not.toContain(word);
         });
       });
@@ -490,7 +490,7 @@ describe('Content Quality Tests', () => {
         return;
       }
 
-      const productTypes = [...new Set(staticContent.vendors.map(v => v.productType))];
+      const productTypes = [...new Set(staticContent.vendors.map((v: VendorPersonality) => v.productType))];
       
       // Should have at least 2 different product types
       expect(productTypes.length).toBeGreaterThanOrEqual(2);
@@ -504,7 +504,7 @@ describe('Content Quality Tests', () => {
         return;
       }
 
-      staticContent.vendors.forEach((vendor, index) => {
+      staticContent.vendors.forEach((vendor: VendorPersonality, index: number) => {
         expect(vendor.movement.speed, `Vendor ${index} speed too low`).toBeGreaterThan(0);
         expect(vendor.movement.speed, `Vendor ${index} speed too high`).toBeLessThan(200);
         
@@ -513,7 +513,7 @@ describe('Content Quality Tests', () => {
         
         // Section preferences should be valid
         expect(vendor.movement.sectionPreferences).toBeDefined();
-        Object.values(vendor.movement.sectionPreferences).forEach((pref) => {
+        Object.values(vendor.movement.sectionPreferences).forEach((pref: number) => {
           expect(pref).toBeGreaterThan(0);
           expect(pref).toBeLessThan(2);
         });
@@ -528,8 +528,8 @@ describe('Content Quality Tests', () => {
         return;
       }
 
-      staticContent.mascots.forEach((mascot, index) => {
-        mascot.abilities.forEach((ability, abilityIndex) => {
+      staticContent.mascots.forEach((mascot: MascotPersonality, index: number) => {
+        mascot.abilities.forEach((ability: any, abilityIndex: number) => {
           expect(ability.id, `Mascot ${index} ability ${abilityIndex} missing id`).toBeTruthy();
           expect(ability.name, `Mascot ${index} ability ${abilityIndex} missing name`).toBeTruthy();
           expect(ability.description, `Mascot ${index} ability ${abilityIndex} missing description`).toBeTruthy();
@@ -547,9 +547,9 @@ describe('Content Quality Tests', () => {
         return;
       }
 
-      staticContent.mascots.forEach((mascot) => {
-        mascot.abilities.forEach((ability) => {
-          ability.effects.forEach((effect) => {
+      staticContent.mascots.forEach((mascot: MascotPersonality) => {
+        mascot.abilities.forEach((ability: any) => {
+          ability.effects.forEach((effect: any) => {
             // Effects should have reasonable values
             expect(Math.abs(effect.value)).toBeGreaterThan(0);
             expect(Math.abs(effect.value)).toBeLessThan(100);
@@ -570,8 +570,8 @@ describe('Content Quality Tests', () => {
         return;
       }
 
-      staticContent.announcers.forEach((announcer, index) => {
-        announcer.catchphrases.forEach((catchphrase, cpIndex) => {
+      staticContent.announcers.forEach((announcer: AnnouncerContent, index: number) => {
+        announcer.catchphrases.forEach((catchphrase: any, cpIndex: number) => {
           expect(catchphrase.id, `Announcer ${index} catchphrase ${cpIndex} missing id`).toBeTruthy();
           expect(catchphrase.text, `Announcer ${index} catchphrase ${cpIndex} missing text`).toBeTruthy();
           expect(catchphrase.trigger, `Announcer ${index} catchphrase ${cpIndex} missing trigger`).toBeTruthy();
@@ -590,8 +590,8 @@ describe('Content Quality Tests', () => {
       // Key conditions that should be present in catchphrases
       const keyConditions = ['perfectWave', 'minMultiplier', 'consecutiveSuccesses'];
       
-      staticContent.announcers.forEach((announcer) => {
-        const hasKeyCondition = announcer.catchphrases.some(cp => {
+      staticContent.announcers.forEach((announcer: AnnouncerContent) => {
+        const hasKeyCondition = announcer.catchphrases.some((cp: any) => {
           if (!cp.trigger.conditions) return false;
           return keyConditions.some(cond => cond in cp.trigger.conditions!);
         });
@@ -614,7 +614,7 @@ describe('Content Quality Tests', () => {
         ...staticContent.mascots,
       ];
 
-      allPersonalities.forEach((personality, index) => {
+      allPersonalities.forEach((personality, index: number) => {
         expect(personality.appearance.spriteSheet, `Personality ${index} missing spriteSheet`).toBeTruthy();
         expect(personality.appearance.animations, `Personality ${index} missing animations`).toBeInstanceOf(Array);
         expect(personality.appearance.animations.length, `Personality ${index} has no animations`).toBeGreaterThan(0);
@@ -638,7 +638,7 @@ describe('Content Quality Tests', () => {
       const hexColorRegex = /^#[0-9A-Fa-f]{6}$/;
 
       allPersonalities.forEach((personality) => {
-        personality.appearance.colorPalette.forEach((color) => {
+        personality.appearance.colorPalette.forEach((color: string) => {
           expect(hexColorRegex.test(color), `Invalid color: ${color}`).toBe(true);
         });
       });
@@ -670,9 +670,9 @@ describe('Content Quality Tests', () => {
       }
 
       const allNames = [
-        ...staticContent.vendors.map(v => v.name),
-        ...staticContent.mascots.map(m => m.name),
-        ...staticContent.announcers.map(a => a.name),
+        ...staticContent.vendors.map((v: VendorPersonality) => v.name),
+        ...staticContent.mascots.map((m: MascotPersonality) => m.name),
+        ...staticContent.announcers.map((a: AnnouncerContent) => a.name),
       ];
 
       // All names should be unique
@@ -687,7 +687,7 @@ describe('Content Quality Tests', () => {
       }
 
       // Check that vendors have different dialogue
-      const vendorDialogueTexts = staticContent.vendors.flatMap(v => v.dialogue.map(d => d.text));
+      const vendorDialogueTexts = staticContent.vendors.flatMap((v: VendorPersonality) => v.dialogue.map((d: DialogueLine) => d.text));
       const uniqueVendorDialogue = new Set(vendorDialogueTexts);
       
       // Most dialogue should be unique (allowing some repetition)
@@ -713,8 +713,8 @@ describe('Content Quality Tests', () => {
       const content = await contentManager.getContent();
       
       // All dialogue should have required fields for dialogue manager
-      content.vendors.forEach((vendor) => {
-        vendor.dialogue.forEach((line) => {
+      content.vendors.forEach((vendor: VendorPersonality) => {
+        vendor.dialogue.forEach((line: DialogueLine) => {
           expect(line.id).toBeTruthy();
           expect(line.text).toBeTruthy();
           expect(line.context).toBeDefined();

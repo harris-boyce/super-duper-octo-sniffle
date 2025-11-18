@@ -17,7 +17,7 @@ import { AIContentManager } from '@/systems/AIContentManager';
 import { DialogueManager } from '@/systems/DialogueManager';
 import { AnnouncerSystem } from '@/systems/AnnouncerSystem';
 import { getCurrentEpoch, getEpochStartTime } from '@/config/ai-config';
-import type { GameAIContent, DialogueLine } from '@/types/personalities';
+import type { GameAIContent, DialogueLine, VendorPersonality } from '@/managers/interfaces/personalities';
 
 // Performance test configuration
 const PERFORMANCE_TARGETS = {
@@ -542,7 +542,7 @@ describe('AI Performance Benchmarks', () => {
       const start = performance.now();
 
       // Simulate 10 concurrent characters speaking
-      const promises = content.vendors.slice(0, 10).map(vendor =>
+      const promises = content.vendors.slice(0, 10).map((vendor: VendorPersonality) =>
         Promise.resolve(
           dialogueManager.selectDialogue(
             vendor.id,

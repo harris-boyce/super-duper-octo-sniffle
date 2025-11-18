@@ -8,7 +8,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { AIContentManager } from '@/systems/AIContentManager';
 import { getCurrentEpoch, getEpochStartTime } from '@/config/ai-config';
-import type { GameAIContent } from '@/types/personalities';
+import type { GameAIContent } from '@/managers/interfaces/personalities';
 
 // Mock global fetch for fallback content
 const mockFallbackContent: GameAIContent = {
@@ -417,7 +417,7 @@ describe('AIContentManager', () => {
       const results = await Promise.all(promises);
 
       // All should return valid content with same epoch
-      results.forEach((content) => {
+      results.forEach((content: GameAIContent) => {
         expect(content).toBeDefined();
         expect(content.epoch).toBe(results[0].epoch);
       });

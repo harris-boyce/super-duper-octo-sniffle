@@ -7,7 +7,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { DialogueManager } from '@/systems/DialogueManager';
-import type { DialogueLine, GameEventType } from '@/types/personalities';
+import type { DialogueLine, GameEventType } from '@/managers/interfaces/personalities';
 import type { DialogueSelectionContext } from '@/systems/DialogueManager';
 
 // Test dialogue lines

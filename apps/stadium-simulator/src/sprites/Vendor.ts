@@ -184,7 +184,8 @@ export class Vendor extends BaseActorContainer {
         this.rotation = 0;
         break;
 
-      case 'movingSegment':
+      case 'movingToSection':
+      case 'movingToFan':
         // Subtle bob animation while moving
         this.startBobAnimation();
         break;
@@ -205,7 +206,7 @@ export class Vendor extends BaseActorContainer {
         this.bottom.setFillStyle(0x008800);
         break;
 
-      case 'planning':
+      case 'scanningInSection':
       case 'rangedCharging':
         // Neutral for now
         this.bottom.setFillStyle(0x00aa00);
@@ -225,7 +226,7 @@ export class Vendor extends BaseActorContainer {
         ease: 'Sine.easeInOut',
         yoyo: true,
         onComplete: () => {
-          if (this.currentState === 'movingSegment') {
+          if (this.currentState === 'movingToSection' || this.currentState === 'movingToFan') {
             bobCycle();
           }
         },

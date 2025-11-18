@@ -17,7 +17,7 @@ import { AIContentManager } from '@/systems/AIContentManager';
 import { DialogueManager } from '@/systems/DialogueManager';
 import { AnnouncerSystem } from '@/systems/AnnouncerSystem';
 import { getCurrentEpoch, getEpochStartTime } from '@/config/ai-config';
-import type { GameAIContent, VendorPersonality, MascotPersonality, AnnouncerContent } from '@/types/personalities';
+import type { GameAIContent, VendorPersonality, MascotPersonality, AnnouncerContent } from '@/managers/interfaces/personalities';
 
 // Mock game AI content for integration testing
 const createMockGameContent = (epoch: number): GameAIContent => ({

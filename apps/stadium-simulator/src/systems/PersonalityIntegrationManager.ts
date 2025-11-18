@@ -18,7 +18,7 @@ import { DialogueManager } from './DialogueManager';
 import { AnnouncerSystem } from './AnnouncerSystem';
 import { Vendor } from '@/sprites/Vendor';
 import { Mascot } from '@/sprites/Mascot';
-import type { GameAIContent, VendorPersonality, MascotPersonality, AnnouncerContent } from '@/types/personalities';
+import type { GameAIContent, VendorPersonality, MascotPersonality, AnnouncerContent } from '@/managers/interfaces/personalities';
 
 /**
  * Personality Integration Manager
@@ -162,7 +162,7 @@ export class PersonalityIntegrationManager {
    * @returns VendorPersonality or undefined
    */
   public getVendorPersonality(vendorId: string): VendorPersonality | undefined {
-    return this.content?.vendors.find(v => v.id === vendorId);
+    return this.content?.vendors.find((v: VendorPersonality) => v.id === vendorId);
   }
 
   /**
@@ -172,7 +172,7 @@ export class PersonalityIntegrationManager {
    * @returns MascotPersonality or undefined
    */
   public getMascotPersonality(mascotId: string): MascotPersonality | undefined {
-    return this.content?.mascots.find(m => m.id === mascotId);
+    return this.content?.mascots.find((m: MascotPersonality) => m.id === mascotId);
   }
 
   /**
@@ -182,7 +182,7 @@ export class PersonalityIntegrationManager {
    * @returns AnnouncerContent or undefined
    */
   public getAnnouncerContent(announcerId: string): AnnouncerContent | undefined {
-    return this.content?.announcers.find(a => a.id === announcerId);
+    return this.content?.announcers.find((a: AnnouncerContent) => a.id === announcerId);
   }
 
   /**

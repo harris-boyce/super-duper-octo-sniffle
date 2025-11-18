@@ -18,8 +18,8 @@ import type {
   DialogueLine,
   DialogueContext,
   GameEventType,
-} from '@/types/personalities';
-import type { Section } from '@/types/GameTypes';
+} from '@/managers/interfaces/personalities';
+import type { Section } from '@/managers/interfaces/Section';
 
 /**
  * Usage tracking entry for a dialogue line

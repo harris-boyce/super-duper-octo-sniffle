@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { AnnouncerSystem } from '@/systems/AnnouncerSystem';
-import type { AnnouncerContent } from '@/types/personalities';
+import type { AnnouncerContent } from '@/managers/interfaces/personalities';
 import { DialogueManager } from '@/systems/DialogueManager';
 
 // Mock announcer content

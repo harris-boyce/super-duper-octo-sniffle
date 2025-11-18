@@ -11,7 +11,7 @@
  * - Event-driven commentary triggers
  */
 
-import type { AnnouncerContent, DialogueLine, Catchphrase } from '@/types/personalities';
+import type { AnnouncerContent, DialogueLine, Catchphrase } from '@/managers/interfaces/personalities';
 import type { DialogueManager } from './DialogueManager';
 
 export type CommentaryContext = 
