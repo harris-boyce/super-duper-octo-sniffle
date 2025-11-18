@@ -10,7 +10,7 @@ import { SpeechBubbleDemoScene } from './scenes/SpeechBubbleDemoScene';
 import { GridOverlay } from './scenes/GridOverlay';
 
 // Detect debug/test mode from URL before exporting config
-let scenes: Phaser.Types.Scenes.SceneType[] = [MenuScene, WorldScene, StadiumScene, ScoreReportScene, GameOverScene, TestSectionScene];
+let scenes: Phaser.Types.Scenes.SceneType[] = [MenuScene, WorldScene, StadiumScene, ScoreReportScene, GameOverScene];
 try {
   const url = new URL(window.location.href);
   const testMode = url.searchParams.get('test');
