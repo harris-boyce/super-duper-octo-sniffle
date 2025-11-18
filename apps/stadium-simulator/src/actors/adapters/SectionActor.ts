@@ -3,7 +3,6 @@ import { StadiumSection } from '@/sprites/StadiumSection';
 import type { ActorCategory } from '@/actors/interfaces/ActorTypes';
 import type { FanData } from '@/services/LevelService';
 import { Fan } from '@/sprites/Fan';
-import { SeatActor } from '@/sprites/Seat';
 import { SectionRowActor } from './SectionRowActor';
 
 /**
