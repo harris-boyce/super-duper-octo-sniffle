@@ -350,6 +350,8 @@ export class HybridPathResolver {
           type: 'stair',
           side: 'right',
           sectionIdx: i,
+          gridRow: 0,
+          gridCol: 0,
           x: currentBounds.x + currentBounds.width,
           y: (currentBounds.y + currentBounds.y + currentBounds.height) / 2,
         });
@@ -558,9 +560,9 @@ export class HybridPathResolver {
       const firstNode = this.graph.nodes.get(nodePath[0]);
       if (firstNode) {
         const GROUND_Y = 650; // Ground level Y coordinate
-        
+
         // If vendor is significantly above ground and first node is ground type
-        if (fromY < GROUND_Y - 10 && firstNode.nodeType === 'ground') {
+        if (fromY < GROUND_Y - 10 && firstNode.type === 'ground') {
           // Add intermediate waypoint: move vertically to ground level first
           segments.push({
             nodeType: 'ground',
@@ -732,6 +734,8 @@ export class HybridPathResolver {
         return `rowEntry_${node.colIdx === 0 ? 'left' : 'right'}_${node.sectionIdx}_${node.rowIdx}`;
       case 'seat':
         return `seat_${node.sectionIdx}_${node.rowIdx}_${node.colIdx}`;
+      case 'ground':
+        return `ground_${node.gridRow}_${node.gridCol}`;
     }
   }
 
@@ -853,11 +857,12 @@ export class HybridPathResolver {
     let cost = segment.cost; // base distance cost
 
     // Apply node type base speed modifier
-    const speedModifiers = {
+    const speedModifiers: Record<PathNodeType, number> = {
       corridor: gameBalance.vendorMovement.baseSpeedCorridor,
       stair: gameBalance.vendorMovement.baseSpeedStair,
       rowEntry: gameBalance.vendorMovement.baseSpeedRow,
       seat: gameBalance.vendorMovement.baseSpeedRow,
+      ground: gameBalance.vendorMovement.baseSpeedCorridor, // Ground uses corridor speed
     };
 
     cost = cost / speedModifiers[segment.nodeType];

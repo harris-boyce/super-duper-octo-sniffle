@@ -52,14 +52,16 @@ export interface VendorProfile {
 /**
  * Vendor state machine states
  */
-export type VendorState = 
-  | 'idle' 
+export type VendorState =
+  | 'idle'
+  | 'planning'  // Planning path to destination
+  | 'movingSegment'  // Moving along a path segment
   | 'movingToSection'  // Moving to section entry point
   | 'scanningInSection'  // At section, scanning for targets
   | 'movingToFan'  // Moving to specific fan
-  | 'serving' 
-  | 'cooldown' 
-  | 'distracted' 
+  | 'serving'
+  | 'cooldown'
+  | 'distracted'
   | 'rangedCharging';
 
 /**
@@ -79,6 +81,10 @@ export interface PathSegment {
   rowIdx?: number;
   /** Column index (if applicable) */
   colIdx?: number;
+  /** Grid row (if applicable) */
+  gridRow?: number;
+  /** Grid column (if applicable) */
+  gridCol?: number;
   /** World X coordinate */
   x: number;
   /** World Y coordinate */

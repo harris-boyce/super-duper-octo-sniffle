@@ -3,6 +3,10 @@ import type { MascotPersonality, MascotAbility, AbilityEffect } from '@/types/pe
 import type { DialogueManager } from '@/systems/DialogueManager';
 import { BaseActorSprite } from './helpers/BaseActor';
 
+/**
+ * Mascot context states for dialogue selection
+ */
+type MascotContext = 'entrance' | 'hyping' | 'dancing' | 'disappointed' | 'ultimate' | 'exit';
 
 export class Mascot extends BaseActorSprite {
   private cooldown: number;
@@ -18,7 +22,7 @@ export class Mascot extends BaseActorSprite {
         personality?: MascotPersonality,
     dialogueManager?: DialogueManager
   ) {
-    super(scene, x, y, 'mascot'); // 'mascot' sprite key to be loaded
+    super(scene, x, y, 'mascot', 'mascot'); // texture key and actor type
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
