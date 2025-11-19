@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import type { VendorState } from '@/managers/interfaces/VendorTypes';
 import { BaseActorContainer } from './helpers/BaseActor';
+import type { VendorPersonality, DialogueLine } from '@/types/personalities';
+import type { DialogueManager } from '@/systems/DialogueManager';
 
 /**
  * Vendor is a visual container composed of two rectangles:
@@ -18,8 +20,14 @@ export class Vendor extends BaseActorContainer {
   private bottom: Phaser.GameObjects.Rectangle;
   private currentState: VendorState;
   private stateAnimation?: Phaser.Time.TimerEvent;
+    private personality: VendorPersonality | null;
+  private dialogueManager: DialogueManager | null;
+  private vendorId: string;
 
-  constructor(scene: Phaser.Scene, x: number, y: number) {
+  constructor(scene: Phaser.Scene, x: number, y: number,
+    personality?: VendorPersonality,
+    dialogueManager?: DialogueManager
+  ) {
     super(scene, x, y, 'vendor', false); // disabled by default
 
     // Body: green rectangle (20x30 pixels)
@@ -33,7 +41,105 @@ export class Vendor extends BaseActorContainer {
     this.currentState = 'idle';
     this.logger.debug(`Spawned at (${x}, ${y})`);
 
+    this.personality = personality || null;
+    this.dialogueManager = dialogueManager || null;
+    this.vendorId = personality ? personality.id : 'unknown';
+
+    // Apply visual customization if personality is provided
+    if (this.personality) {
+      this.applyVisualCustomization();
+    }
+
     // Note: Don't call scene.add.existing here - let the caller decide
+  }
+
+  
+  /**
+   * Get behavior-modified movement speed
+   */
+  public getMovementSpeed(): number {
+    if (!this.personality) {
+      return 100; // Default speed
+    }
+    return this.personality.movement.speed;
+  }
+
+  /**
+   * Get pause duration at sections
+   */
+  public getPauseDuration(): number {
+    if (!this.personality) {
+      return 2000; // Default 2 seconds
+    }
+    return this.personality.movement.pauseDuration;
+  }
+
+  /**
+   * Get section preference weight for a given section
+   */
+  public getSectionPreference(sectionId: string): number {
+    if (!this.personality) {
+      return 1.0; // Neutral preference
+    }
+    return this.personality.movement.sectionPreferences[sectionId] || 1.0;
+  }
+
+  /**
+   * Apply visual customization based on personality
+   */
+  private applyVisualCustomization(): void {
+    if (!this.personality) return;
+
+    // Apply color tint from personality palette
+    if (this.personality.appearance.colorPalette.length > 0) {
+      const primaryColor = this.personality.appearance.colorPalette[0];
+      // this.bottom.setTint(parseInt(primaryColor.replace('#', '0x')));
+    }
+
+    // Apply scale from personality
+    // this.setScale(this.personality.appearance.scale);
+  }
+
+  public triggerDialogue(
+    event: 'vendorServe' | 'waveComplete' | 'sectionSuccess' | 'sectionFail',
+    gameContext: {
+      score: number;
+      waveState: 'active' | 'inactive' | 'countdown';
+      sectionStats?: {
+        happiness: number;
+        thirst: number;
+        attention: number;
+      };
+    }
+  ): string | null {
+    if (!this.personality || !this.dialogueManager) {
+      return null;
+    }
+
+    const dialogueLine = this.dialogueManager.selectDialogue(
+      this.vendorId,
+      this.personality.dialogue,
+      {
+        event,
+        ...gameContext,
+      }
+    );
+
+    return dialogueLine?.text || null;
+  }
+
+  /**
+   * Get vendor's personality
+   */
+  public getPersonality(): VendorPersonality | null {
+    return this.personality;
+  }
+
+  /**
+   * Get vendor's unique ID
+   */
+  public getVendorId(): string {
+    return this.vendorId;
   }
 
   /**
@@ -60,7 +166,8 @@ export class Vendor extends BaseActorContainer {
         this.rotation = 0;
         break;
 
-      case 'movingSegment':
+        case 'movingToFan':
+      case 'movingToSection':
         // Subtle bob animation while moving
         this.startBobAnimation();
         break;
@@ -81,7 +188,6 @@ export class Vendor extends BaseActorContainer {
         this.bottom.setFillStyle(0x008800);
         break;
 
-      case 'planning':
       case 'rangedCharging':
         // Neutral for now
         this.bottom.setFillStyle(0x00aa00);
@@ -101,7 +207,7 @@ export class Vendor extends BaseActorContainer {
         ease: 'Sine.easeInOut',
         yoyo: true,
         onComplete: () => {
-          if (this.currentState === 'movingSegment') {
+          if (this.currentState === 'movingToSection' || this.currentState === 'movingToFan') {
             bobCycle();
           }
         },
