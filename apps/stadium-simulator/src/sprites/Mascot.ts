@@ -1,10 +1,10 @@
 import Phaser from 'phaser';
 import type { MascotPersonality, MascotAbility, AbilityEffect } from '@/types/personalities';
 import type { DialogueManager } from '@/systems/DialogueManager';
+import { BaseActorSprite } from './helpers/BaseActor';
 
-export type MascotContext = 'entrance' | 'hyping' | 'dancing' | 'disappointed' | 'ultimate' | 'exit';
 
-export class Mascot extends Phaser.GameObjects.Sprite {
+export class Mascot extends BaseActorSprite {
   private cooldown: number;
   private isActive: boolean;
   private personality: MascotPersonality | null;
@@ -14,11 +14,8 @@ export class Mascot extends Phaser.GameObjects.Sprite {
   private abilityTimer: number;
   private currentContext: MascotContext;
 
-  constructor(
-    scene: Phaser.Scene, 
-    x: number, 
-    y: number,
-    personality?: MascotPersonality,
+  constructor(scene: Phaser.Scene, x: number, y: number,
+        personality?: MascotPersonality,
     dialogueManager?: DialogueManager
   ) {
     super(scene, x, y, 'mascot'); // 'mascot' sprite key to be loaded
