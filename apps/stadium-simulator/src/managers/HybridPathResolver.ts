@@ -3,6 +3,7 @@ import type { StadiumSection } from '@/sprites/StadiumSection';
 import type { Fan } from '@/sprites/Fan';
 import type { GridManager } from '@/managers/GridManager';
 import type { ActorRegistry } from '@/actors/ActorRegistry';
+import { GridPathfinder } from '@/managers/GridPathfinder';
 import { gameBalance } from '@/config/gameBalance';
 
 /**
@@ -124,11 +125,13 @@ export class HybridPathResolver {
   private sections: StadiumSection[];
   private gridManager?: GridManager;
   private actorRegistry?: ActorRegistry;
+  private gridPathfinder?: GridPathfinder;
 
   constructor(sections: StadiumSection[], gridManager?: GridManager, actorRegistry?: ActorRegistry) {
     this.sections = sections;
     this.gridManager = gridManager;
     this.actorRegistry = actorRegistry;
+    this.gridPathfinder = gridManager ? new GridPathfinder(gridManager) : undefined;
     this.graph = this.buildNavigationGraph(sections);
   }
 
@@ -246,7 +249,7 @@ export class HybridPathResolver {
       });
     }
     
-    // Connect ground nodes to each other (allowing diagonal movement)
+    // Connect ground nodes to each other (orthogonal only, no diagonals)
     const groundNodes = Array.from(nodes.entries()).filter(([id, node]) => node.type === 'ground');
     groundNodes.forEach(([nodeId, node], idx) => {
       // Connect to next ground node (horizontal)
@@ -259,15 +262,8 @@ export class HybridPathResolver {
         this.addEdge(edges, nextId, nodeId, distance * 0.5);
       }
       
-      // Connect to diagonal neighbors for true diagonal movement
-      if (idx < groundNodes.length - 2) {
-        const [diagId, diagNode] = groundNodes[idx + 2];
-        const distance = Math.sqrt(
-          Math.pow(diagNode.x - node.x, 2) + Math.pow(diagNode.y - node.y, 2)
-        );
-        this.addEdge(edges, nodeId, diagId, distance * 0.6); // Slightly higher cost
-        this.addEdge(edges, diagId, nodeId, distance * 0.6);
-      }
+      // NOTE: Diagonal ground edges removed - GridPathfinder handles all ground movement
+      // with zone-aware directional pathfinding
     });
     
     // Connect ground nodes to front corridor nodes (vertical transition from ground to corridor)
@@ -739,68 +735,140 @@ export class HybridPathResolver {
    * Expand path between two navigation nodes into grid-aligned waypoints
    * Uses Manhattan (orthogonal) movement to avoid diagonal cutting through rows
    */
+  /**
+   * Expand high-level path segment (node to node) into grid-level waypoints
+   * Delegates to GridPathfinder for zone-aware directional pathfinding
+   * Includes boundary fallback logic when primary path fails
+   * 
+   * Uses Manhattan (orthogonal) movement to avoid diagonal cutting through rows
+   */
   private expandToGridPath(fromNode: NavigationNode, toNode: NavigationNode): PathSegment[] {
     const segments: PathSegment[] = [];
     
-    if (!this.gridManager) {
+    if (!this.gridManager || !this.gridPathfinder) {
       // No grid manager - fall back to direct segment
       return [this.nodeToSegment(toNode, this.calculateDistance(fromNode.x, fromNode.y, toNode.x, toNode.y))];
     }
-    
-    // Convert world positions to grid coordinates
+
+    // Delegate to GridPathfinder for zone-aware A* pathfinding
+    const vendorProfile: VendorProfile = {
+      id: 'temp-vendor',
+      quality: 'good',
+      targetFan: null,
+      abilities: [],
+    };
+
+    const gridPath = this.gridPathfinder.findPath(
+      vendorProfile,
+      fromNode.x,
+      fromNode.y,
+      toNode.x,
+      toNode.y
+    );
+
+    // If pathfinding succeeded, return the segments
+    if (gridPath.length > 0) {
+      return gridPath;
+    }
+
+    // Path failed - attempt boundary fallback if transitioning to/from seats
     const fromGrid = this.worldToGrid(fromNode.x, fromNode.y);
     const toGrid = this.worldToGrid(toNode.x, toNode.y);
-    
+
     if (!fromGrid || !toGrid) {
       return [this.nodeToSegment(toNode, this.calculateDistance(fromNode.x, fromNode.y, toNode.x, toNode.y))];
     }
-    
-    // Use Manhattan path: move horizontally first, then vertically
-    // This prevents diagonal movement across rows
-    const currentRow = fromGrid.row;
-    const currentCol = fromGrid.col;
-    const targetRow = toGrid.row;
-    const targetCol = toGrid.col;
-    
-    // Move horizontally
-    if (currentCol !== targetCol) {
-      const colStep = currentCol < targetCol ? 1 : -1;
-      for (let col = currentCol + colStep; col !== targetCol + colStep; col += colStep) {
-        const worldPos = this.gridManager.gridToWorld(currentRow, col);
-        segments.push({
-          nodeType: fromNode.type === 'ground' ? 'ground' : 'corridor',
-          sectionIdx: 'sectionIdx' in fromNode ? fromNode.sectionIdx : 0,
-          rowIdx: currentRow,
-          colIdx: col,
-          gridRow: currentRow,
-          gridCol: col,
-          x: worldPos.x,
-          y: worldPos.y,
-          cost: this.gridManager.getWorldSize().cellSize,
-        });
+
+    // Check if we're trying to access a seat zone
+    const toZone = this.gridManager.getZoneType(toGrid.row, toGrid.col);
+    const fromZone = this.gridManager.getZoneType(fromGrid.row, fromGrid.col);
+
+    if (toZone === 'seat' || fromZone === 'seat') {
+      // Try alternative boundary cells
+      const boundaries = this.gridManager.getBoundarySet('rowEntry');
+      
+      if (boundaries.length > 0) {
+        // Try each boundary in order of distance to target
+        const sortedBoundaries = boundaries
+          .map(b => ({
+            boundary: b,
+            distance: Math.abs(b.gridRow - toGrid.row) + Math.abs(b.gridCol - toGrid.col),
+          }))
+          .sort((a, b) => a.distance - b.distance);
+
+        for (const { boundary } of sortedBoundaries) {
+          const boundaryWorld = this.gridManager.gridToWorld(boundary.gridRow, boundary.gridCol);
+          
+          // Try path through this boundary
+          const pathToBoundary = this.gridPathfinder.findPath(
+            vendorProfile,
+            fromNode.x,
+            fromNode.y,
+            boundaryWorld.x,
+            boundaryWorld.y
+          );
+
+          if (pathToBoundary.length > 0) {
+            const pathFromBoundary = this.gridPathfinder.findPath(
+              vendorProfile,
+              boundaryWorld.x,
+              boundaryWorld.y,
+              toNode.x,
+              toNode.y
+            );
+
+            if (pathFromBoundary.length > 0) {
+              // Success! Combine paths (remove duplicate boundary cell)
+              console.log(`[HybridPathResolver] Used boundary fallback via (${boundary.gridRow},${boundary.gridCol})`);
+              return [...pathToBoundary, ...pathFromBoundary.slice(1)];
+            }
+          }
+        }
       }
-    }
-    
-    // Move vertically
-    if (currentRow !== targetRow) {
-      const rowStep = currentRow < targetRow ? 1 : -1;
-      for (let row = currentRow + rowStep; row !== targetRow + rowStep; row += rowStep) {
-        const worldPos = this.gridManager.gridToWorld(row, targetCol);
-        segments.push({
-          nodeType: toNode.type === 'stair' ? 'stair' : toNode.type,
-          sectionIdx: 'sectionIdx' in toNode ? toNode.sectionIdx : 0,
-          rowIdx: row,
-          colIdx: targetCol,
-          gridRow: row,
-          gridCol: targetCol,
-          x: worldPos.x,
-          y: worldPos.y,
-          cost: this.gridManager.getWorldSize().cellSize,
-        });
+
+      // All boundaries failed, try stair landings as last resort
+      const stairBoundaries = this.gridManager.getBoundarySet('stairLanding');
+      if (stairBoundaries.length > 0) {
+        const sortedStairs = stairBoundaries
+          .map(b => ({
+            boundary: b,
+            distance: Math.abs(b.gridRow - toGrid.row) + Math.abs(b.gridCol - toGrid.col),
+          }))
+          .sort((a, b) => a.distance - b.distance);
+
+        for (const { boundary } of sortedStairs.slice(0, 2)) { // Try only closest 2
+          const boundaryWorld = this.gridManager.gridToWorld(boundary.gridRow, boundary.gridCol);
+          
+          const pathToBoundary = this.gridPathfinder.findPath(
+            vendorProfile,
+            fromNode.x,
+            fromNode.y,
+            boundaryWorld.x,
+            boundaryWorld.y
+          );
+
+          if (pathToBoundary.length > 0) {
+            const pathFromBoundary = this.gridPathfinder.findPath(
+              vendorProfile,
+              boundaryWorld.x,
+              boundaryWorld.y,
+              toNode.x,
+              toNode.y
+            );
+
+            if (pathFromBoundary.length > 0) {
+              console.log(`[HybridPathResolver] Used stair boundary fallback via (${boundary.gridRow},${boundary.gridCol})`);
+              return [...pathToBoundary, ...pathFromBoundary.slice(1)];
+            }
+          }
+        }
       }
+
+      console.warn(`[HybridPathResolver] All boundary fallbacks failed from (${fromGrid.row},${fromGrid.col}) to (${toGrid.row},${toGrid.col})`);
     }
-    
-    return segments;
+
+    // Ultimate fallback: return empty array (caller will handle retry)
+    return [];
   }
 
   /**

@@ -316,6 +316,28 @@ export const gameBalance = {
   },
 
   /**
+   * Grid pathfinding zone-based costs
+   * Used by GridPathfinder for A* movement cost calculation
+   */
+  pathfinding: {
+    // Zone type cost multipliers (applied to base cell size)
+    zoneCosts: {
+      ground: 0.7, // Ground is fastest
+      corridor: 0.8, // Corridors are fast
+      rowEntry: 1.2, // Entering rows is slower
+      seat: 2.0, // Moving through seats is very slow
+      stair: 1.5, // Stairs are moderately slow
+      sky: 999, // Sky is impassable (failsafe)
+    } as Record<'ground' | 'corridor' | 'rowEntry' | 'seat' | 'stair' | 'sky', number>,
+    
+    // Transition crossing penalty (added when crossing zone boundaries)
+    transitionCrossPenalty: 10,
+    
+    // Ground diagonal penalty (for future diagonal support in ground zones)
+    groundDiagonalPenalty: 5,
+  },
+
+  /**
    * Grump/difficult terrain configuration
    * Foundation for future grump fan type
    */

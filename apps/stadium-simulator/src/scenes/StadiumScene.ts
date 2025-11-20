@@ -75,6 +75,22 @@ export class StadiumScene extends Phaser.Scene {
     this.levelData = levelData; // Cache for later use
     console.log('[StadiumScene] Level data loaded:', levelData);
 
+    // Load zone configuration into GridManager
+    if (this.gridManager && levelData.gridConfig) {
+      console.log('[StadiumScene] Loading zone config into GridManager');
+      console.log('[StadiumScene] gridConfig structure:', {
+        hasCellRanges: !!levelData.gridConfig.cellRanges,
+        cellRangesCount: levelData.gridConfig.cellRanges?.length,
+        hasCells: !!levelData.gridConfig.cells,
+        cellsCount: levelData.gridConfig.cells?.length,
+        hasGridConfig: !!levelData.gridConfig.gridConfig,
+      });
+      this.gridManager.loadZoneConfig(levelData.gridConfig);
+      console.log('[StadiumScene] Zone config loaded successfully');
+    } else {
+      console.warn('[StadiumScene] GridManager or gridConfig not available');
+    }
+
     // Attach actorRegistry to the scene instance for WaveManager access
     (this as any).actorRegistry = this.actorRegistry;
 
@@ -289,6 +305,27 @@ export class StadiumScene extends Phaser.Scene {
         keyboard.addKey('V').on('down', () => {
           if (this.gridOverlay) {
             this.gridOverlay.toggleVendorPaths();
+          }
+        });
+
+        // Z key: Toggle zone visualization (only if grid visible)
+        keyboard.addKey('Z').on('down', () => {
+          if (this.gridOverlay) {
+            this.gridOverlay.toggleZones();
+          }
+        });
+
+        // T key: Toggle transition markers (only if grid visible)
+        keyboard.addKey('T').on('down', () => {
+          if (this.gridOverlay) {
+            this.gridOverlay.toggleTransitions();
+          }
+        });
+
+        // E key: Toggle directional edges (only if grid visible)
+        keyboard.addKey('E').on('down', () => {
+          if (this.gridOverlay) {
+            this.gridOverlay.toggleDirectionalEdges();
           }
         });
       }

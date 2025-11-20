@@ -9,9 +9,14 @@ import { gameBalance } from '@/config/gameBalance';
 export class GridPathfinder {
   private gridManager: GridManager;
   private passableCache: Map<string, boolean> = new Map();
+  private directionalCache: Map<string, boolean> = new Map();
 
   constructor(gridManager: GridManager) {
     this.gridManager = gridManager;
+    
+    // Subscribe to grid events for cache invalidation
+    this.gridManager.on('gridChanged', () => this.clearCache());
+    this.gridManager.on('zonesLoaded', () => this.clearCache());
   }
 
   /**
@@ -168,7 +173,7 @@ export class GridPathfinder {
         const neighborKey = `${neighbor.row},${neighbor.col}`;
 
         if (closedSet.has(neighborKey)) continue;
-        if (!this.isPassable(neighbor.row, neighbor.col)) continue;
+        if (!this.isPassableInDirection(currentRow, currentCol, neighbor.row, neighbor.col)) continue;
 
         const tentativeGScore = (gScore.get(current) || 0) + 
           this.getMovementCost(currentRow, currentCol, neighbor.row, neighbor.col);
@@ -194,6 +199,7 @@ export class GridPathfinder {
 
   /**
    * Reconstruct path from A* cameFrom map
+   * In dev mode, validates that all steps are axis-aligned and directionally legal
    */
   private reconstructPath(
     cameFrom: Map<string, string>,
@@ -205,6 +211,29 @@ export class GridPathfinder {
       const [row, col] = current.split(',').map(Number);
       path.unshift({ row, col });
       current = cameFrom.get(current) || '';
+    }
+
+    // Dev-mode path validation
+    if (import.meta.env.DEV) {
+      for (let i = 1; i < path.length; i++) {
+        const from = path[i - 1];
+        const to = path[i];
+        
+        // Assert axis-aligned movement (no diagonals)
+        const rowDiff = Math.abs(to.row - from.row);
+        const colDiff = Math.abs(to.col - from.col);
+        const isAxisAligned = (rowDiff === 1 && colDiff === 0) || (rowDiff === 0 && colDiff === 1);
+        
+        if (!isAxisAligned) {
+          console.error(`[GridPathfinder] Non-axis-aligned step detected: (${from.row},${from.col}) -> (${to.row},${to.col})`);
+        }
+        
+        // Assert directional passability
+        const isDirectionallyLegal = this.gridManager.isPassableDirection(from.row, from.col, to.row, to.col);
+        if (!isDirectionallyLegal) {
+          console.error(`[GridPathfinder] Illegal directional step: (${from.row},${from.col}) -> (${to.row},${to.col})`);
+        }
+      }
     }
 
     return path;
@@ -239,34 +268,48 @@ export class GridPathfinder {
 
   /**
    * Get movement cost between two adjacent cells
+   * Uses zone types and transition penalties from gameBalance
    */
   private getMovementCost(fromRow: number, fromCol: number, toRow: number, toCol: number): number {
     const cellSize = this.gridManager.getWorldSize().cellSize;
-    const toType = this.getCellType(toRow, toCol);
+    const toCell = this.gridManager.getCell(toRow, toCol);
+    
+    if (!toCell) return cellSize;
 
     // Base cost is cell size
     let cost = cellSize;
 
-    // Apply multipliers based on terrain type
-    switch (toType) {
-      case 'stair':
-        cost *= gameBalance.vendorMovement.stairTransitionCost;
-        break;
-      case 'corridor':
-        cost *= 0.8; // Corridors are fast
-        break;
-      case 'ground':
-        cost *= 0.7; // Ground is fastest
-        break;
-      case 'rowEntry':
-        cost *= 1.2; // Entering rows is slower
-        break;
-      case 'seat':
-        cost *= 2.0; // Moving through seats is very slow
-        break;
+    // Apply zone-specific cost multipliers
+    const zoneCosts = gameBalance.pathfinding.zoneCosts;
+    const zoneType = toCell.zoneType || 'corridor';
+    const multiplier = zoneCosts[zoneType] || 1.0;
+    cost *= multiplier;
+
+    // Apply transition crossing penalty if moving between different zones
+    const fromCell = this.gridManager.getCell(fromRow, fromCol);
+    if (fromCell && fromCell.zoneType !== toCell.zoneType) {
+      cost += gameBalance.pathfinding.transitionCrossPenalty;
     }
 
     return cost;
+  }
+
+  /**
+   * Check if movement is allowed from one cell to another (directional)
+   * Uses GridManager's zone-aware directional passability checks
+   */
+  private isPassableInDirection(fromRow: number, fromCol: number, toRow: number, toCol: number): boolean {
+    const key = `${fromRow},${fromCol}->${toRow},${toCol}`;
+    
+    // Check directional cache
+    if (this.directionalCache.has(key)) {
+      return this.directionalCache.get(key)!;
+    }
+
+    // Delegate to GridManager's zone-aware directional check
+    const passable = this.gridManager.isPassableDirection(fromRow, fromCol, toRow, toCol);
+    this.directionalCache.set(key, passable);
+    return passable;
   }
 
   /**
@@ -323,9 +366,10 @@ export class GridPathfinder {
   }
 
   /**
-   * Clear passability cache (call when grid changes)
+   * Clear passability and directional caches (call when grid changes)
    */
   public clearCache(): void {
     this.passableCache.clear();
+    this.directionalCache.clear();
   }
 }
