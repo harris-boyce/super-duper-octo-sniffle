@@ -40,6 +40,7 @@ export const gameBalance = {
     happinessThreshold: 40, // happiness must be below this
     visualOpacity: 0.7, // reduced opacity for disinterested fans
     visualTint: 0x888888, // gray tint for disinterested fans
+    tintMixRatio: 0.5, // ratio for mixing original color with gray tint (0-1)
     jiggleReduction: 0.5, // reduce jiggle frequency by 50%
     stateCheckInterval: 500, // ms between state checks (performance optimization)
   },

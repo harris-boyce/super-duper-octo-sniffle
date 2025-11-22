@@ -37,6 +37,7 @@ export class Fan extends BaseActorContainer {
   private isDisinterested: boolean = false;
   private lastDisinterestedCheck: number = 0;
   private savedBaseIntensity: number = 0; // Store original intensity when becoming disinterested
+  private hasIntensitySaved: boolean = false; // Track whether intensity was saved
 
   // Grump/difficult terrain stats (foundation for future grump type)
   private disgruntlement: number = 0; // only grows for future grump type
@@ -566,19 +567,24 @@ export class Fan extends BaseActorContainer {
       this.setAlpha(gameBalance.fanDisengagement.visualOpacity);
       // Apply gray tint by mixing original color with gray
       const tintColor = gameBalance.fanDisengagement.visualTint;
+      const mixRatio = gameBalance.fanDisengagement.tintMixRatio;
       if (this.top) {
-        const mixedTopColor = Fan.mixColors(this.topOriginalColor, tintColor, 0.5);
+        const mixedTopColor = Fan.mixColors(this.topOriginalColor, tintColor, mixRatio);
         this.top.setFillStyle(mixedTopColor);
       }
       // For bottom, we'll let setIntensity handle the color and apply alpha
       // The reduced alpha combined with the gray-tinted top is sufficient visual feedback
       
       // Save original intensity and reduce jiggle
-      if (this.baseIntensity > 0) {
+      // Always save, regardless of current value (including 0)
+      if (!this.hasIntensitySaved) {
         this.savedBaseIntensity = this.baseIntensity;
+        this.hasIntensitySaved = true;
         this.stopJiggleTimer();
         this.baseIntensity = this.baseIntensity * gameBalance.fanDisengagement.jiggleReduction;
-        this.startJiggleTimer();
+        if (this.baseIntensity > 0) {
+          this.startJiggleTimer();
+        }
       }
     } else {
       this.setAlpha(1.0);
@@ -587,11 +593,13 @@ export class Fan extends BaseActorContainer {
         this.top.setFillStyle(this.topOriginalColor);
       }
       // Restore original jiggle intensity
-      if (this.savedBaseIntensity > 0) {
+      if (this.hasIntensitySaved) {
         this.stopJiggleTimer();
         this.baseIntensity = this.savedBaseIntensity;
-        this.savedBaseIntensity = 0;
-        this.startJiggleTimer();
+        this.hasIntensitySaved = false;
+        if (this.baseIntensity > 0) {
+          this.startJiggleTimer();
+        }
       }
       // Resume normal intensity-based coloring for body
       this.setIntensity();
