@@ -24,6 +24,7 @@ export class Fan extends BaseActorContainer {
   // Store original colors for tint restoration
   private topOriginalColor: number;
   private bottomOriginalColor: number = 0xffffff;
+  private topDisinterestedColor: number = 0x888888; // Cached mixed color for disinterested state
 
   // Fan-level stats
   private happiness: number;
@@ -66,6 +67,11 @@ export class Fan extends BaseActorContainer {
     // Choose top color between pale yellow and medium brown
     const topColor = Fan.randomTopColor();
     this.topOriginalColor = topColor;
+
+    // Pre-calculate disinterested color for performance
+    const tintColor = gameBalance.fanDisengagement.visualTint;
+    const mixRatio = gameBalance.fanDisengagement.tintMixRatio;
+    this.topDisinterestedColor = Fan.mixColors(topColor, tintColor, mixRatio);
 
     // We'll position children so that the local origin (0,0) is at the bottom-most
     // point of the bottom rectangle. This makes container rotation pivot at that point.
@@ -565,12 +571,9 @@ export class Fan extends BaseActorContainer {
   private updateDisinterestedVisual(): void {
     if (this.isDisinterested) {
       this.setAlpha(gameBalance.fanDisengagement.visualOpacity);
-      // Apply gray tint by mixing original color with gray
-      const tintColor = gameBalance.fanDisengagement.visualTint;
-      const mixRatio = gameBalance.fanDisengagement.tintMixRatio;
+      // Apply pre-calculated gray tint to head
       if (this.top) {
-        const mixedTopColor = Fan.mixColors(this.topOriginalColor, tintColor, mixRatio);
-        this.top.setFillStyle(mixedTopColor);
+        this.top.setFillStyle(this.topDisinterestedColor);
       }
       // For bottom, we'll let setIntensity handle the color and apply alpha
       // The reduced alpha combined with the gray-tinted top is sufficient visual feedback
