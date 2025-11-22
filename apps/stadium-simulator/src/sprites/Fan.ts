@@ -24,7 +24,7 @@ export class Fan extends BaseActorContainer {
   // Store original colors for tint restoration
   private topOriginalColor: number;
   private bottomOriginalColor: number = 0xffffff;
-  private topDisinterestedColor: number = 0x888888; // Cached mixed color for disinterested state
+  private topDisinterestedColor!: number; // Pre-calculated in constructor (no default value)
 
   // Fan-level stats
   private happiness: number;
@@ -112,7 +112,10 @@ export class Fan extends BaseActorContainer {
     this.bottom.setFillStyle(finalColor);
 
     // Jiggle when t > 0 (handled by intermittent timers that trigger short tweens)
-    this.baseIntensity = t;
+    // Only update baseIntensity if not currently disinterested (to preserve saved state)
+    if (!this.isDisinterested) {
+      this.baseIntensity = t;
+    }
     if (t > 0) {
       this.startJiggleTimer();
     } else {
@@ -581,9 +584,12 @@ export class Fan extends BaseActorContainer {
       // Save original intensity and reduce jiggle
       // Always save, regardless of current value (including 0)
       if (!this.hasIntensitySaved) {
+        // Stop jiggle first
+        this.stopJiggleTimer();
+        // Save BEFORE modifying
         this.savedBaseIntensity = this.baseIntensity;
         this.hasIntensitySaved = true;
-        this.stopJiggleTimer();
+        // Now reduce intensity
         this.baseIntensity = this.baseIntensity * gameBalance.fanDisengagement.jiggleReduction;
         if (this.baseIntensity > 0) {
           this.startJiggleTimer();
