@@ -20,5 +20,6 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
       'phaser3spectorjs': path.resolve(__dirname, './src/__tests__/__mocks__/phaser3spectorjs.ts'),
     },
+    extensions: ['.ts', '.js', '.mjs', '.cjs', '.json'],
   },
 });

@@ -276,6 +276,13 @@ export class Mascot extends BaseActorSprite {
   }
 
   /**
+   * Get remaining auto-rotation cooldown time in milliseconds
+   */
+  public getAutoRotationCooldown(): number {
+    return this.autoRotationCooldown;
+  }
+
+  /**
    * Get current depth factor for targeting
    * Higher = further from fans = prefer distant targets
    */
@@ -367,5 +374,21 @@ export class Mascot extends BaseActorSprite {
 
   public getBody(): Phaser.Physics.Arcade.Body {
     return this.body as Phaser.Physics.Arcade.Body;
+  }
+
+  /**
+   * @internal Test helper - force immediate deactivation
+   * Only use in tests to simulate duration expiration
+   */
+  public __TEST_forceDeactivation(): void {
+    this.activeDuration = 0;
+  }
+
+  /**
+   * @internal Test helper - set cooldown for testing
+   * Only use in tests to control cooldown state
+   */
+  public __TEST_setCooldown(ms: number): void {
+    this.movementCooldown = ms;
   }
 }

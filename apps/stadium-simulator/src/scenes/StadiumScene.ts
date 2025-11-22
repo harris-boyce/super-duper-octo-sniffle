@@ -42,6 +42,7 @@ export class StadiumScene extends Phaser.Scene {
   private mascots: Mascot[] = []; // Track mascot sprites
   private mascotSectionMap: Map<string, Mascot> = new Map(); // Track which mascot is in which section
   private autoRotationMode: boolean = false; // Auto-rotation mode for mascots
+  private mascotKeys: Phaser.Input.Keyboard.Key[] = []; // Track keyboard keys for cleanup
   private demoMode: boolean = false;
   private debugMode: boolean = false;
   private successStreak: number = 0;
@@ -308,6 +309,9 @@ export class StadiumScene extends Phaser.Scene {
 
     // Setup mascot keyboard controls
     this.setupMascotKeyboardControls();
+
+    // Setup cleanup on scene shutdown
+    this.events.once('shutdown', this.cleanupMascotControls, this);
 
     // Notify WorldScene that initialization is complete
     this.events.emit('stadiumReady', { aiManager: this.aiManager });
@@ -1335,7 +1339,9 @@ export class StadiumScene extends Phaser.Scene {
     if (!keyboard) return;
 
     // M key: Activate first available mascot in first available section
-    keyboard.addKey('M').on('down', () => {
+    const mKey = keyboard.addKey('M');
+    this.mascotKeys.push(mKey);
+    mKey.on('down', () => {
       const availableMascot = this.mascots.find(m => m.canActivate());
       const availableSection = this.sections.find(s => !this.mascotSectionMap.has(s.getId()));
 
@@ -1350,7 +1356,9 @@ export class StadiumScene extends Phaser.Scene {
 
     // Number keys (1-4): Assign mascot to specific section by index
     for (let i = 1; i <= 4; i++) {
-      keyboard.addKey(`${i}`).on('down', () => {
+      const numKey = keyboard.addKey(`${i}`);
+      this.mascotKeys.push(numKey);
+      numKey.on('down', () => {
         const sectionIndex = i - 1;
         if (sectionIndex >= this.sections.length) return;
 
@@ -1374,13 +1382,24 @@ export class StadiumScene extends Phaser.Scene {
     }
 
     // A key: Toggle auto-rotation mode for all mascots
-    keyboard.addKey('A').on('down', () => {
+    const aKey = keyboard.addKey('A');
+    this.mascotKeys.push(aKey);
+    aKey.on('down', () => {
       this.autoRotationMode = !this.autoRotationMode;
       this.mascots.forEach(m => {
         m.setMovementMode(this.autoRotationMode ? 'auto' : 'manual');
       });
       console.log(`[Mascot] Auto-rotation mode: ${this.autoRotationMode ? 'ON' : 'OFF'}`);
     });
+  }
+
+  /**
+   * Clean up keyboard listeners on scene shutdown
+   */
+  private cleanupMascotControls(): void {
+    // Remove all mascot keyboard listeners
+    this.mascotKeys.forEach(key => key.off('down'));
+    this.mascotKeys = [];
   }
 
   /**
@@ -1414,7 +1433,29 @@ export class StadiumScene extends Phaser.Scene {
           mascot.clearSection();
         }
       }
+
+      // Auto-rotation: automatically move mascot to next section
+      if (gameBalance.mascot.autoRotationEnabled &&
+          mascot.getMovementMode() === 'auto' &&
+          mascot.canActivate() &&
+          mascot.getAutoRotationCooldown() <= 0) {
+        this.autoRotateMascot(mascot);
+      }
     });
+  }
+
+  /**
+   * Auto-rotate a mascot to the next available section
+   */
+  private autoRotateMascot(mascot: Mascot): void {
+    // Find next available section (sequential rotation)
+    const availableSection = this.sections.find(s => !this.mascotSectionMap.has(s.getId()));
+
+    if (availableSection) {
+      mascot.activateInSection(availableSection, 'auto');
+      this.mascotSectionMap.set(availableSection.getId(), mascot);
+      console.log(`[Mascot Auto-Rotation] Activated mascot in section ${availableSection.getId()}`);
+    }
   }
 
   /**

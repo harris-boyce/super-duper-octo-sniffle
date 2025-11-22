@@ -3,6 +3,10 @@
  * Global test configuration and mocks
  */
 
+// Mock phaser3spectorjs before Phaser loads
+import { vi } from 'vitest';
+vi.mock('phaser3spectorjs', () => ({}));
+
 // Mock canvas and its context for happy-dom environment
 if (typeof HTMLCanvasElement !== 'undefined') {
   HTMLCanvasElement.prototype.getContext = function (contextType: string) {

@@ -95,6 +95,9 @@ export class MascotPerimeterPath {
 
     // Calculate movement
     const segmentLength = this.getSegmentLength();
+    if (segmentLength === 0) {
+      return; // Skip movement if segment has no length (avoid division by zero)
+    }
     const distanceMoved = effectiveSpeed * (deltaTime / 1000); // pixels
     const progressDelta = distanceMoved / segmentLength;
 
@@ -130,10 +133,19 @@ export class MascotPerimeterPath {
 
   /**
    * Initiate a shortcut across the section interior
+   *
+   * NOTE: This method captures the current position before setting isOnShortcut=true.
+   * getCurrentPosition() relies on the isOnShortcut flag, so order of operations matters:
+   * 1. Call getCurrentPosition() while still on perimeter (isOnShortcut=false)
+   * 2. Set isOnShortcut=true to switch to shortcut mode
+   * 3. Use captured position as shortcutStart
    */
   private initiateShortcut(): void {
+    // Capture current position before modifying state
+    const startPosition = this.getCurrentPosition();
+
     this.isOnShortcut = true;
-    this.shortcutStart = this.getCurrentPosition();
+    this.shortcutStart = startPosition;
 
     // Pick a random destination corner (different from current)
     const currentSegmentIndex = this.getSegmentIndex();

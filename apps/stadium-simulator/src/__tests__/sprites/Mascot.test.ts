@@ -5,6 +5,13 @@ import { gameBalance } from '@/config/gameBalance';
 
 // Mock Phaser scene
 const createMockScene = (): any => {
+  const mockEventEmitter = {
+    on: vi.fn(),
+    once: vi.fn(),
+    off: vi.fn(),
+    emit: vi.fn(),
+  };
+
   return {
     add: {
       existing: vi.fn(),
@@ -19,6 +26,28 @@ const createMockScene = (): any => {
     },
     time: {
       delayedCall: vi.fn(),
+    },
+    sys: {
+      queueDepthSort: vi.fn(),
+      displayList: {
+        add: vi.fn(),
+      },
+      updateList: {
+        add: vi.fn(),
+      },
+      events: mockEventEmitter,
+    },
+    events: mockEventEmitter,
+    anims: {
+      on: vi.fn(),
+      once: vi.fn(),
+      off: vi.fn(),
+    },
+    textures: {
+      exists: vi.fn().mockReturnValue(true),
+      get: vi.fn().mockReturnValue({
+        has: vi.fn().mockReturnValue(false),
+      }),
     },
   };
 };
@@ -102,9 +131,8 @@ describe('Mascot Movement System', () => {
     it('should enter cooldown after deactivation', () => {
       mascot.activateInSection(section);
 
-      // Force immediate deactivation by setting duration to 0
-      // (accessing private property for testing purposes)
-      (mascot as any).activeDuration = 0;
+      // Force immediate deactivation using test helper
+      mascot.__TEST_forceDeactivation();
       mascot.update(16);
 
       expect(mascot.getCooldown()).toBeGreaterThan(0);
@@ -113,8 +141,8 @@ describe('Mascot Movement System', () => {
     });
 
     it('should reduce cooldown over time', () => {
-      // Set cooldown manually for testing
-      (mascot as any).movementCooldown = 5000; // 5 seconds
+      // Set cooldown using test helper
+      mascot.__TEST_setCooldown(5000); // 5 seconds
 
       expect(mascot.getCooldown()).toBe(5000);
 
@@ -177,7 +205,7 @@ describe('Mascot Movement System', () => {
     it('should not move while in cooldown', () => {
       // Activate and then deactivate
       mascot.activateInSection(section);
-      (mascot as any).activeDuration = 0;
+      mascot.__TEST_forceDeactivation();
       mascot.update(16);
 
       // Now in cooldown
@@ -294,7 +322,7 @@ describe('Mascot Movement System', () => {
       const mascot2 = new Mascot(scene, 0, 0);
 
       mascot.activateInSection(section);
-      (mascot as any).activeDuration = 0;
+      mascot.__TEST_forceDeactivation();
       mascot.update(16); // Deactivate mascot 1
 
       mascot2.activateInSection(section);
