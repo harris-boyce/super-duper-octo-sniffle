@@ -1,14 +1,23 @@
 import Phaser from 'phaser';
 import type { MascotPersonality, MascotAbility, AbilityEffect } from '@/types/personalities';
 import type { DialogueManager } from '@/systems/DialogueManager';
+import type { StadiumSection } from './StadiumSection';
 import { BaseActorSprite } from './helpers/BaseActor';
+import { MascotPerimeterPath } from './MascotPerimeterPath';
+import { gameBalance } from '@/config/gameBalance';
 
 /**
  * Mascot context states for dialogue selection
  */
 type MascotContext = 'entrance' | 'hyping' | 'dancing' | 'disappointed' | 'ultimate' | 'exit';
 
+/**
+ * Movement mode for mascot behavior
+ */
+type MovementMode = 'manual' | 'auto';
+
 export class Mascot extends BaseActorSprite {
+  // Existing ability system properties
   private cooldown: number;
   private isActive: boolean;
   private personality: MascotPersonality | null;
@@ -17,6 +26,16 @@ export class Mascot extends BaseActorSprite {
   private activeAbility: MascotAbility | null;
   private abilityTimer: number;
   private currentContext: MascotContext;
+
+  // Movement system properties
+  private perimeterPath: MascotPerimeterPath | null = null;
+  private activeDuration: number = 0; // time remaining in current activation
+  private maxDuration: number = 0; // total duration for current activation
+  private movementSpeed: number = 0;
+  private assignedSection: StadiumSection | null = null;
+  private movementMode: MovementMode = 'manual';
+  private movementCooldown: number = 0; // cooldown before can be activated again
+  private autoRotationCooldown: number = 0; // cooldown before switching sections in auto mode
 
   constructor(scene: Phaser.Scene, x: number, y: number,
         personality?: MascotPersonality,
@@ -173,29 +192,176 @@ export class Mascot extends BaseActorSprite {
     this.currentContext = context;
   }
 
+  /**
+   * Activate mascot in a specific section for perimeter patrol
+   * @param section - Stadium section to patrol
+   * @param mode - Movement mode ('manual' or 'auto')
+   */
+  public activateInSection(section: StadiumSection, mode: MovementMode = 'manual'): void {
+    this.assignedSection = section;
+    this.movementMode = mode;
+    this.isActive = true;
+    this.perimeterPath = new MascotPerimeterPath(section);
+
+    // Random duration between min and max
+    this.maxDuration = Phaser.Math.Between(
+      gameBalance.mascot.minDuration,
+      gameBalance.mascot.maxDuration
+    );
+    this.activeDuration = this.maxDuration;
+    this.movementSpeed = gameBalance.mascot.movementSpeed;
+
+    // Position at starting point
+    const pos = this.perimeterPath.getCurrentPosition();
+    this.setPosition(pos.x, pos.y);
+    this.setFlipX(pos.facing === 'left');
+    this.setVisible(true);
+
+    console.log(`[Mascot ${this.mascotId}] Activated in section ${section.getId()}, duration: ${this.maxDuration}ms, mode: ${mode}`);
+  }
+
+  /**
+   * Deactivate mascot and start cooldown
+   */
+  private deactivate(): void {
+    this.isActive = false;
+    this.perimeterPath = null;
+
+    // Random cooldown between min and max
+    this.movementCooldown = Phaser.Math.Between(
+      gameBalance.mascot.minCooldown,
+      gameBalance.mascot.maxCooldown
+    );
+
+    // In auto mode, set section switch cooldown
+    if (this.movementMode === 'auto') {
+      this.autoRotationCooldown = gameBalance.mascot.autoRotationSectionCooldown;
+    }
+
+    this.setVisible(false);
+    console.log(`[Mascot ${this.mascotId}] Deactivated, cooldown: ${this.movementCooldown}ms`);
+  }
+
+  /**
+   * Update perimeter movement
+   */
+  private updateMovement(delta: number): void {
+    if (!this.perimeterPath || !this.assignedSection) return;
+
+    // Update position along perimeter
+    this.perimeterPath.advance(delta, this.movementSpeed);
+    const pos = this.perimeterPath.getCurrentPosition();
+    this.setPosition(pos.x, pos.y);
+    this.setFlipX(pos.facing === 'left');
+
+    // Update duration timer
+    this.activeDuration -= delta;
+    if (this.activeDuration <= 0) {
+      this.deactivate();
+    }
+  }
+
+  /**
+   * Check if mascot can be activated (not in cooldown and not active)
+   */
+  public canActivate(): boolean {
+    return !this.isActive && this.movementCooldown <= 0;
+  }
+
+  /**
+   * Get remaining cooldown time in milliseconds
+   */
+  public getCooldown(): number {
+    return this.movementCooldown;
+  }
+
+  /**
+   * Get current depth factor for targeting
+   * Higher = further from fans = prefer distant targets
+   */
+  public getDepthFactor(): number {
+    return this.perimeterPath?.getDepthFactor() || gameBalance.mascot.depthFactorFrontSides;
+  }
+
+  /**
+   * Get assigned section
+   */
+  public getAssignedSection(): StadiumSection | null {
+    return this.assignedSection;
+  }
+
+  /**
+   * Set movement mode
+   */
+  public setMovementMode(mode: MovementMode): void {
+    this.movementMode = mode;
+  }
+
+  /**
+   * Get movement mode
+   */
+  public getMovementMode(): MovementMode {
+    return this.movementMode;
+  }
+
+  /**
+   * Manually assign to a section (without activating)
+   * Used for preparing mascot before activation
+   */
+  public assignToSection(section: StadiumSection): void {
+    this.assignedSection = section;
+  }
+
+  /**
+   * Clear section assignment
+   */
+  public clearSection(): void {
+    this.assignedSection = null;
+  }
+
+  /**
+   * Check if mascot is actively patrolling
+   */
+  public isPatrolling(): boolean {
+    return this.isActive && this.perimeterPath !== null;
+  }
+
   public activate(): void {
-    // TODO: Implement mascot activation logic
-    // Trigger special ability
+    // Legacy method - trigger special ability
     if (this.cooldown <= 0) {
       this.activateAbility(0); // Activate first ability by default
     }
   }
 
   public update(delta: number): void {
-    // Update cooldown timer
+    // Update ability cooldown timer (existing system)
     if (this.cooldown > 0) {
       this.cooldown -= delta;
     }
 
-    // Update ability timer
-    if (this.isActive && this.abilityTimer > 0) {
+    // Update ability timer (existing system)
+    if (this.activeAbility && this.abilityTimer > 0) {
       this.abilityTimer -= delta;
-      
+
       if (this.abilityTimer <= 0) {
         // Ability expired
-        this.isActive = false;
         this.activeAbility = null;
       }
+    }
+
+    // Update movement cooldown
+    if (this.movementCooldown > 0) {
+      this.movementCooldown -= delta;
+    }
+
+    // Update auto-rotation cooldown
+    if (this.autoRotationCooldown > 0) {
+      this.autoRotationCooldown -= delta;
+    }
+
+    // Update perimeter movement
+    if (this.isActive && this.perimeterPath) {
+      this.updateMovement(delta);
     }
   }
 

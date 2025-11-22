@@ -61,6 +61,33 @@ export class StadiumSection extends Phaser.GameObjects.Container {
   }
 
   /**
+   * Get the bounding box of the section for perimeter calculations
+   * Returns absolute coordinates based on container position
+   */
+  public getSectionBounds(): { left: number; right: number; top: number; bottom: number } {
+    return {
+      left: this.x - this.sectionWidth / 2,
+      right: this.x + this.sectionWidth / 2,
+      top: this.y - this.sectionHeight / 2,
+      bottom: this.y + this.sectionHeight / 2,
+    };
+  }
+
+  /**
+   * Get the section's width
+   */
+  public getWidth(): number {
+    return this.sectionWidth;
+  }
+
+  /**
+   * Get the section's height
+   */
+  public getHeight(): number {
+    return this.sectionHeight;
+  }
+
+  /**
    * Initializes SectionRow objects and adds them to the container
    * TODO: This will be replaced by SectionRowActor initialization in SectionActor
    */
