@@ -611,6 +611,8 @@ export class Fan extends BaseActorContainer {
         }
       }
       // Resume normal intensity-based coloring for body
+      // Call without parameters to recalculate based on current thirst
+      // (not saved intensity, since thirst may have changed while disinterested)
       this.setIntensity();
     }
   }
