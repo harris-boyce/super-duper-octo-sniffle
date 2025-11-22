@@ -1,0 +1,13 @@
+{
+	"servers": {
+		"augments": {
+			"url": "https://mcp.augments.dev/mcp",
+			"type": "http"
+		},
+		"github": {
+			"type": "http",
+			"url": "https://api.githubcopilot.com/mcp/"
+		}
+	},
+	"inputs": []
+}
