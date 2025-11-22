@@ -32,6 +32,19 @@ export const gameBalance = {
   },
 
   /**
+   * Fan disengagement configuration
+   * Controls visual state for disinterested fans (low attention + low happiness)
+   */
+  fanDisengagement: {
+    attentionThreshold: 30, // attention must be below this
+    happinessThreshold: 40, // happiness must be below this
+    visualOpacity: 0.7, // reduced opacity for disinterested fans
+    visualTint: 0x888888, // gray tint for disinterested fans
+    jiggleReduction: 0.5, // reduce jiggle frequency by 50%
+    stateCheckInterval: 500, // ms between state checks (performance optimization)
+  },
+
+  /**
    * Wave strength and momentum configuration
    */
   waveStrength: {

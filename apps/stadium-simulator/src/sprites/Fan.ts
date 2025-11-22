@@ -21,6 +21,10 @@ export class Fan extends BaseActorContainer {
   private jiggleTimer?: Phaser.Time.TimerEvent;
   private baseIntensity: number = 0;
 
+  // Store original colors for tint restoration
+  private topOriginalColor: number;
+  private bottomOriginalColor: number = 0xffffff;
+
   // Fan-level stats
   private happiness: number;
   private thirst: number;
@@ -28,6 +32,10 @@ export class Fan extends BaseActorContainer {
 
   // Randomized thirst growth rate (environmental sensitivity)
   private thirstMultiplier: number;
+
+  // Disinterested state tracking
+  private isDisinterested: boolean = false;
+  private lastDisinterestedCheck: number = 0;
 
   // Grump/difficult terrain stats (foundation for future grump type)
   private disgruntlement: number = 0; // only grows for future grump type
@@ -55,6 +63,7 @@ export class Fan extends BaseActorContainer {
 
     // Choose top color between pale yellow and medium brown
     const topColor = Fan.randomTopColor();
+    this.topOriginalColor = topColor;
 
     // We'll position children so that the local origin (0,0) is at the bottom-most
     // point of the bottom rectangle. This makes container rotation pivot at that point.
@@ -476,6 +485,11 @@ export class Fan extends BaseActorContainer {
     return (rr << 16) + (rg << 8) + rb;
   }
 
+  // Mix two colors together with a given ratio
+  private static mixColors(a: number, b: number, ratio: number): number {
+    return Fan.lerpColor(a, b, ratio);
+  }
+
   private static randomTopColor(): number {
     // pale yellow (#FFF5B1) -> medium brown (#A67C52)
     const a = 0xfff5b1;
@@ -514,6 +528,77 @@ export class Fan extends BaseActorContainer {
 
   public getAttention(): number {
     return this.attention;
+  }
+
+  /**
+   * Check if this fan is in a disinterested state
+   * Only checks every 500ms to avoid performance hit
+   * @returns true if fan is disinterested (attention < 30 AND happiness < 40)
+   */
+  public checkDisinterestedState(): boolean {
+    const now = this.scene.time.now;
+    // Only check every 500ms to avoid performance hit
+    if (now - this.lastDisinterestedCheck < gameBalance.fanDisengagement.stateCheckInterval) {
+      return this.isDisinterested;
+    }
+    
+    this.lastDisinterestedCheck = now;
+    const wasDisinterested = this.isDisinterested;
+    this.isDisinterested = (
+      this.attention < gameBalance.fanDisengagement.attentionThreshold && 
+      this.happiness < gameBalance.fanDisengagement.happinessThreshold
+    );
+    
+    // Update visual if state changed
+    if (wasDisinterested !== this.isDisinterested) {
+      this.updateDisinterestedVisual();
+    }
+    
+    return this.isDisinterested;
+  }
+
+  /**
+   * Update visual appearance based on disinterested state
+   */
+  private updateDisinterestedVisual(): void {
+    if (this.isDisinterested) {
+      this.setAlpha(gameBalance.fanDisengagement.visualOpacity);
+      // Apply gray tint by mixing original color with gray
+      const tintColor = gameBalance.fanDisengagement.visualTint;
+      if (this.top) {
+        const mixedTopColor = Fan.mixColors(this.topOriginalColor, tintColor, 0.5);
+        this.top.setFillStyle(mixedTopColor);
+      }
+      if (this.bottom) {
+        // Bottom color is handled by setIntensity, but we'll apply gray tint
+        const currentBottomColor = this.bottom.fillColor;
+        const mixedBottomColor = Fan.mixColors(currentBottomColor, tintColor, 0.5);
+        this.bottom.setFillStyle(mixedBottomColor);
+      }
+      // Reduce jiggle intensity by stopping and restarting with lower intensity
+      if (this.baseIntensity > 0) {
+        this.stopJiggleTimer();
+        const reducedIntensity = this.baseIntensity * gameBalance.fanDisengagement.jiggleReduction;
+        this.baseIntensity = reducedIntensity;
+        this.startJiggleTimer();
+      }
+    } else {
+      this.setAlpha(1.0);
+      // Restore original colors by calling setIntensity which recalculates bottom color
+      if (this.top) {
+        this.top.setFillStyle(this.topOriginalColor);
+      }
+      // Resume normal jiggle based on current stats
+      this.setIntensity();
+    }
+  }
+
+  /**
+   * Get disinterested state
+   * @returns true if fan is currently disinterested
+   */
+  public getIsDisinterested(): boolean {
+    return this.isDisinterested;
   }
 
   /**
