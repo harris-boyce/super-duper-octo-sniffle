@@ -595,16 +595,14 @@ export class Fan extends BaseActorContainer {
     });
     
     // Color flash (brief white flash) - apply to child rectangles
-    // Store current colors before flashing
-    const currentTopColor = this.isDisinterested ? this.topDisinterestedColor : this.topOriginalColor;
-    const currentBottomColor = this.bottomOriginalColor;
-    
+    // Fan has just transitioned to engaged, so restore original colors after flash
     this.top.setFillStyle(gameBalance.visuals.reEngageFlashColor);
     this.bottom.setFillStyle(gameBalance.visuals.reEngageFlashColor);
     
     this.scene.time.delayedCall(gameBalance.visuals.reEngageFlashDuration, () => {
-      this.top.setFillStyle(currentTopColor);
-      this.bottom.setFillStyle(currentBottomColor);
+      // Restore to engaged state colors (original colors, not disinterested)
+      this.top.setFillStyle(this.topOriginalColor);
+      this.bottom.setFillStyle(this.bottomOriginalColor);
     });
     
     // Sparkle particles
