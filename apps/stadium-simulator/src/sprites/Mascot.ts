@@ -264,8 +264,10 @@ export class Mascot extends BaseActorSprite {
     if (this.analytics && this.assignedSection) {
       this.analytics.recordPostMascotParticipation(this.assignedSection);
 
-      // Log report
-      console.log(this.analytics.generateReport());
+      // Log report if reporting is enabled
+      if (gameBalance.mascotAnalytics?.reportingEnabled !== false) {
+        console.log(this.analytics.generateReport());
+      }
 
       // Emit analytics event for external systems
       this.emit('mascotAnalytics', this.analytics.getMetrics());

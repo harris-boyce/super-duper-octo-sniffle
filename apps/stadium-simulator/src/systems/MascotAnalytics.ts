@@ -63,13 +63,20 @@ export class MascotAnalytics {
   }
 
   /**
+   * Check if reporting is enabled
+   */
+  private shouldReport(): boolean {
+    return gameBalance.mascotAnalytics?.reportingEnabled !== false;
+  }
+
+  /**
    * Record baseline wave participation before mascot activation
    */
   public recordBaseline(section: StadiumSection): void {
     this.baselineParticipation = this.calculateParticipationRate(section);
     this.metrics.waveParticipationBefore = this.baselineParticipation;
 
-    if (gameBalance.mascotAnalytics?.reportingEnabled !== false) {
+    if (this.shouldReport()) {
       console.log(
         `[MascotAnalytics] Baseline participation: ${this.baselineParticipation.toFixed(1)}%`
       );
@@ -101,7 +108,7 @@ export class MascotAnalytics {
         totalBoost += boost;
 
         // Check if was disinterested and got re-engaged
-        if (fan.getIsDisinterested && fan.getIsDisinterested()) {
+        if (fan.getIsDisinterested()) {
           disinterestedHit++;
 
           // Project if this will re-engage them
@@ -135,7 +142,7 @@ export class MascotAnalytics {
 
     this.shotRecords.push(record);
 
-    if (gameBalance.mascotAnalytics?.reportingEnabled !== false) {
+    if (this.shouldReport()) {
       console.log(
         `[MascotAnalytics] Shot ${shotNumber}: ${fansAffected} fans affected, ` +
           `avg boost: ${averageBoost.toFixed(1)}, disinterested hit: ${disinterestedHit}`
@@ -169,13 +176,14 @@ export class MascotAnalytics {
     this.metrics.participationImprovement =
       currentParticipation - this.metrics.waveParticipationBefore;
 
-    // Calculate average re-engagement boost
-    if (this.metrics.disinterestedReEngaged > 0) {
+    // Calculate average boost per re-engaged fan (not all fans)
+    if (this.metrics.disinterestedReEngaged > 0 && this.metrics.totalFansAffected > 0) {
+      // Use total boost divided by fans affected as a proxy for re-engagement boost
       this.metrics.averageReEngagementBoost =
         this.metrics.totalAttentionBoost / this.metrics.totalFansAffected;
     }
 
-    if (gameBalance.mascotAnalytics?.reportingEnabled !== false) {
+    if (this.shouldReport()) {
       console.log(
         `[MascotAnalytics] Post-mascot participation: ${currentParticipation.toFixed(1)}% ` +
           `(${this.metrics.participationImprovement > 0 ? '+' : ''}${this.metrics.participationImprovement.toFixed(1)}%)`
@@ -198,6 +206,15 @@ export class MascotAnalytics {
   }
 
   /**
+   * Calculate average boost per fan
+   */
+  private getAverageBoostPerFan(): number {
+    return this.metrics.totalFansAffected > 0
+      ? this.metrics.totalAttentionBoost / this.metrics.totalFansAffected
+      : 0;
+  }
+
+  /**
    * Generate summary report
    */
   public generateReport(): string {
@@ -210,7 +227,7 @@ export class MascotAnalytics {
       '--- Fan Impact ---',
       `Fans Affected: ${this.metrics.totalFansAffected}`,
       `Total Attention Boost: ${this.metrics.totalAttentionBoost}`,
-      `Avg Boost/Fan: ${this.metrics.totalFansAffected > 0 ? (this.metrics.totalAttentionBoost / this.metrics.totalFansAffected).toFixed(1) : '0'}`,
+      `Avg Boost/Fan: ${this.getAverageBoostPerFan().toFixed(1)}`,
       `Disinterested Re-Engaged: ${this.metrics.disinterestedReEngaged}`,
       '',
       '--- Wave Participation ---',
