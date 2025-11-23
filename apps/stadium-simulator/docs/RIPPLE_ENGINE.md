@@ -272,7 +272,7 @@ Ripples can boost wave participation by increasing attention.
 // Effect distribution:
 //   10  20  30  20  10
 //   20  30  40  30  20
-//   30  40 [50] 40  30  <- catcher gets +5 if disinterested
+//   30  40 [45] 40  30  <- catcher gets +5 if disinterested (base 40 + 5)
 //   20  30  40  30  20
 //   10  20  30  20  10
 ```
