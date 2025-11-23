@@ -532,7 +532,9 @@ export class Mascot extends BaseActorSprite {
       this.updateMovement(delta);
 
       // Update cannon shot cooldown
-      this.shotCooldown -= delta;
+      if (!this.isCharging) {
+        this.shotCooldown -= delta;
+      }
 
       // Fire cannon if ready
       if (this.shotCooldown <= 0 && this.shotsRemaining > 0 && !this.isCharging) {
