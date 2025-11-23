@@ -300,7 +300,6 @@ describe('MascotAnalytics', () => {
       });
 
       analytics.recordBaseline(section as any);
-      const beforeMetrics = analytics.getMetrics();
 
       // Boost attention significantly (simulating mascot effect)
       fans.forEach((fan) => {
