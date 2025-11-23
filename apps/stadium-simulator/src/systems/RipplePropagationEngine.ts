@@ -215,6 +215,50 @@ export class RipplePropagationEngine {
   }
 
   /**
+   * Combine multiple ripples from same event
+   * Effects are additive but capped at 100 when applied
+   *
+   * @param ripples - Array of ripple effects to combine
+   * @returns Map of fans to total combined boost
+   *
+   * @example
+   * // Two fans catch t-shirts near each other
+   * const ripple1 = engine.calculateRipple(catcher1, section);
+   * const ripple2 = engine.calculateRipple(catcher2, section);
+   * const combined = engine.combineRipples([ripple1, ripple2]);
+   * engine.applyCombinedRipples(combined);
+   * // Fans in overlap area get both boosts added together
+   */
+  public combineRipples(ripples: RippleEffect[]): Map<Fan, number> {
+    const combined = new Map<Fan, number>();
+
+    for (const ripple of ripples) {
+      ripple.affectedFans.forEach((boost, fan) => {
+        const currentBoost = combined.get(fan) || 0;
+        combined.set(fan, currentBoost + boost);
+      });
+    }
+
+    return combined;
+  }
+
+  /**
+   * Apply combined ripples to fans with attention cap
+   *
+   * @param combinedEffects - Result from combineRipples()
+   */
+  public applyCombinedRipples(combinedEffects: Map<Fan, number>): void {
+    combinedEffects.forEach((boost, fan) => {
+      const currentAttention = fan.getAttention();
+      const newAttention = Math.min(100, currentAttention + boost);
+
+      fan.modifyStats({
+        attention: newAttention
+      });
+    });
+  }
+
+  /**
    * Get current configuration
    */
   public getConfig(): RippleConfig {
