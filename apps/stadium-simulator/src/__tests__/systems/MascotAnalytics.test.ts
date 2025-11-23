@@ -309,7 +309,6 @@ describe('MascotAnalytics', () => {
 
       analytics.recordPostMascotParticipation(section as any);
 
-      const metrics = analytics.getMetrics();
       
       // Debug: Check what calculateWaveChance returns
       // chanceBefore: 20 * 0.5 + 30 * 0.5 - 70 * 0.3 + 10 = 25 + 15 - 21 + 10 = 29 (below 50)
