@@ -67,7 +67,7 @@ describe('CatchParticles', () => {
       CatchParticles.create(scene, 100, 200);
       
       expect(mockParticles.explode).toHaveBeenCalledWith(
-        gameBalance.visuals.catchParticleCount, 100, 200
+        gameBalance.visuals.catchParticleCount
       );
     });
     

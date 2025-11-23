@@ -514,6 +514,7 @@ export const gameBalance = {
     // Re-engagement
     reEngageScalePop: 1.3,
     reEngageFlashDuration: 100,
+    reEngageFlashColor: 0xFFFFFF, // White
     reEngageSparkleCount: 8,
     
     // Performance

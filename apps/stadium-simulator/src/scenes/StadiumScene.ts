@@ -268,6 +268,11 @@ export class StadiumScene extends Phaser.Scene {
     this.createWaveStrengthMeter();
 
     // Initialize targeting indicator for mascot visual feedback
+    // Note: Requires 'particle' texture created by MenuScene.preload()
+    if (!this.textures.exists('particle')) {
+      console.warn('[StadiumScene] Particle texture not found, creating fallback');
+      this.createParticleTexture();
+    }
     this.targetingIndicator = new TargetingIndicator(this);
 
     // Create GridOverlay for debug rendering (must be in same scene as camera)
@@ -1542,6 +1547,18 @@ export class StadiumScene extends Phaser.Scene {
         ground.setAlpha(alpha);
       }
     }
+  }
+
+  /**
+   * Create particle texture (fallback if not created by MenuScene)
+   * 4x4 white square for retro aesthetic
+   */
+  private createParticleTexture(): void {
+    const graphics = this.add.graphics();
+    graphics.fillStyle(0xFFFFFF, 1.0);
+    graphics.fillRect(0, 0, 4, 4);
+    graphics.generateTexture('particle', 4, 4);
+    graphics.destroy();
   }
 }
 

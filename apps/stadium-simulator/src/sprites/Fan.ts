@@ -595,15 +595,16 @@ export class Fan extends BaseActorContainer {
     });
     
     // Color flash (brief white flash) - apply to child rectangles
-    const originalTopColor = this.top.fillColor;
-    const originalBottomColor = this.bottom.fillColor;
+    // Store current colors before flashing
+    const currentTopColor = this.isDisinterested ? this.topDisinterestedColor : this.topOriginalColor;
+    const currentBottomColor = this.bottomOriginalColor;
     
-    this.top.setFillStyle(0xFFFFFF);
-    this.bottom.setFillStyle(0xFFFFFF);
+    this.top.setFillStyle(gameBalance.visuals.reEngageFlashColor);
+    this.bottom.setFillStyle(gameBalance.visuals.reEngageFlashColor);
     
     this.scene.time.delayedCall(gameBalance.visuals.reEngageFlashDuration, () => {
-      this.top.setFillStyle(originalTopColor);
-      this.bottom.setFillStyle(originalBottomColor);
+      this.top.setFillStyle(currentTopColor);
+      this.bottom.setFillStyle(currentBottomColor);
     });
     
     // Sparkle particles

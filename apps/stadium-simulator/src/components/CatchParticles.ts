@@ -57,7 +57,7 @@ export class CatchParticles {
     });
     
     // Emit particles
-    particles.explode(particleCount, x, y);
+    particles.explode(particleCount);
     
     // Auto-destroy after animation completes
     scene.time.delayedCall(lifespan + 100, () => {
