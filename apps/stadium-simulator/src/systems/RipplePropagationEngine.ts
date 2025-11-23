@@ -143,7 +143,7 @@ export class RipplePropagationEngine {
    */
   private calculateEffect(distance: number, fan: Fan): number {
     // Outside max radius = no effect
-    if (distance > this.config.maxRadius) {
+    if (distance >= this.config.maxRadius) {
       return 0;
     }
 
