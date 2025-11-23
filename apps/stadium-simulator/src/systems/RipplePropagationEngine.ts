@@ -1,5 +1,5 @@
-import { Fan } from '@/sprites/Fan';
-import { StadiumSection } from '@/sprites/StadiumSection';
+import type { Fan } from '@/sprites/Fan';
+import type { StadiumSection } from '@/sprites/StadiumSection';
 import { gameBalance } from '@/config/gameBalance';
 
 /**
