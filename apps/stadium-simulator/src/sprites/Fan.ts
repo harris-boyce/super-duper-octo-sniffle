@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { gameBalance } from '@/config/gameBalance';
 import { BaseActorContainer } from './helpers/BaseActor';
+import { CatchParticles } from '@/components/CatchParticles';
 
 /**
  * Fan is a small container composed of two rectangles:
@@ -553,6 +554,9 @@ export class Fan extends BaseActorContainer {
     thirst?: number;
     attention?: number;
   }): void {
+    // Store old disinterested state
+    const wasDisinterested = this.isDisinterested;
+    
     if (stats.happiness !== undefined) {
       this.happiness = Math.max(0, Math.min(100, stats.happiness));
     }
@@ -562,6 +566,50 @@ export class Fan extends BaseActorContainer {
     if (stats.attention !== undefined) {
       this.attention = Math.max(0, Math.min(100, stats.attention));
     }
+    
+    // Re-check disinterested state
+    this.checkDisinterestedState();
+    
+    // Trigger re-engagement animation if transitioned
+    if (wasDisinterested && !this.isDisinterested) {
+      this.onReEngaged();
+    }
+  }
+
+  /**
+   * Triggered when fan transitions from disinterested to engaged
+   * Shows visual feedback celebrating re-engagement
+   */
+  private onReEngaged(): void {
+    // Scale pop animation
+    this.scene.tweens.add({
+      targets: this,
+      scaleX: gameBalance.visuals.reEngageScalePop,
+      scaleY: gameBalance.visuals.reEngageScalePop,
+      duration: 150,
+      ease: 'Back.easeOut',
+      yoyo: true,
+      onComplete: () => {
+        this.setScale(1.0);
+      }
+    });
+    
+    // Color flash (brief white flash) - apply to child rectangles
+    // Fan has just transitioned to engaged, so restore original colors after flash
+    this.top.setFillStyle(gameBalance.visuals.reEngageFlashColor);
+    this.bottom.setFillStyle(gameBalance.visuals.reEngageFlashColor);
+    
+    this.scene.time.delayedCall(gameBalance.visuals.reEngageFlashDuration, () => {
+      // Restore to engaged state colors (original colors, not disinterested)
+      this.top.setFillStyle(this.topOriginalColor);
+      this.bottom.setFillStyle(this.bottomOriginalColor);
+    });
+    
+    // Sparkle particles
+    CatchParticles.createSparkle(this.scene, this.x, this.y);
+    
+    // Emit event for potential sound effects
+    this.emit('reEngaged', { fan: this });
   }
 
   /**

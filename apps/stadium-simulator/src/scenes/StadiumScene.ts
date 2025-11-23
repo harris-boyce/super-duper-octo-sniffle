@@ -19,6 +19,7 @@ import { FanActor } from '@/actors/adapters/FanActor';
 import { GridManager } from '@/managers/GridManager';
 import { LevelService } from '@/services/LevelService';
 import { GridOverlay } from '@/scenes/GridOverlay';
+import { TargetingIndicator } from '@/components/TargetingIndicator';
 
 /**
  * StadiumScene renders the visual state of the stadium simulator
@@ -55,6 +56,7 @@ export class StadiumScene extends Phaser.Scene {
   private skyboxActor?: any;
   private groundActor?: any;
   private gridOverlay?: GridOverlay;
+  public targetingIndicator!: TargetingIndicator;
 
   constructor() {
     super({ key: 'StadiumScene' });
@@ -264,6 +266,14 @@ export class StadiumScene extends Phaser.Scene {
 
     // Create wave strength meter (will be shown on wave start)
     this.createWaveStrengthMeter();
+
+    // Initialize targeting indicator for mascot visual feedback
+    // Note: Requires 'particle' texture created by MenuScene.preload()
+    if (!this.textures.exists('particle')) {
+      console.warn('[StadiumScene] Particle texture not found, creating fallback');
+      this.createParticleTexture();
+    }
+    this.targetingIndicator = new TargetingIndicator(this);
 
     // Create GridOverlay for debug rendering (must be in same scene as camera)
     if (this.gridManager) {
@@ -1537,6 +1547,18 @@ export class StadiumScene extends Phaser.Scene {
         ground.setAlpha(alpha);
       }
     }
+  }
+
+  /**
+   * Create particle texture (fallback if not created by MenuScene)
+   * 4x4 white square for retro aesthetic
+   */
+  private createParticleTexture(): void {
+    const graphics = this.add.graphics();
+    graphics.fillStyle(0xFFFFFF, 1.0);
+    graphics.fillRect(0, 0, 4, 4);
+    graphics.generateTexture('particle', 4, 4);
+    graphics.destroy();
   }
 }
 

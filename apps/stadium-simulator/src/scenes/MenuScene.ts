@@ -25,7 +25,24 @@ export class MenuScene extends Phaser.Scene {
   }
 
   preload(): void {
-    // TODO: Add sprite loading in preload()
+    // Create pixel particle texture for visual effects
+    this.createParticleTexture();
+  }
+
+  /**
+   * Create a simple pixel particle texture
+   * 4x4 white square for retro aesthetic
+   */
+  private createParticleTexture(): void {
+    const graphics = this.add.graphics();
+    
+    // Draw 4x4 white square
+    graphics.fillStyle(0xFFFFFF, 1.0);
+    graphics.fillRect(0, 0, 4, 4);
+    
+    // Generate texture
+    graphics.generateTexture('particle', 4, 4);
+    graphics.destroy();
   }
 
   create(): void {
