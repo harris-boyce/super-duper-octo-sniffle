@@ -19,6 +19,7 @@ import { FanActor } from '@/actors/adapters/FanActor';
 import { GridManager } from '@/managers/GridManager';
 import { LevelService } from '@/services/LevelService';
 import { GridOverlay } from '@/scenes/GridOverlay';
+import { TargetingIndicator } from '@/components/TargetingIndicator';
 
 /**
  * StadiumScene renders the visual state of the stadium simulator
@@ -55,6 +56,7 @@ export class StadiumScene extends Phaser.Scene {
   private skyboxActor?: any;
   private groundActor?: any;
   private gridOverlay?: GridOverlay;
+  public targetingIndicator!: TargetingIndicator;
 
   constructor() {
     super({ key: 'StadiumScene' });
@@ -264,6 +266,9 @@ export class StadiumScene extends Phaser.Scene {
 
     // Create wave strength meter (will be shown on wave start)
     this.createWaveStrengthMeter();
+
+    // Initialize targeting indicator for mascot visual feedback
+    this.targetingIndicator = new TargetingIndicator(this);
 
     // Create GridOverlay for debug rendering (must be in same scene as camera)
     if (this.gridManager) {

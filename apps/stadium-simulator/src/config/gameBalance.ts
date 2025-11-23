@@ -496,6 +496,29 @@ export const gameBalance = {
     groundDepth: -100,
     skyDepth: -101,
   },
+
+  /**
+   * Visual effects configuration for particles, indicators, and animations
+   */
+  visuals: {
+    // Targeting indicator
+    targetingReticleRadius: 25,
+    targetingReticleColor: 0xFFFF00, // Yellow
+    targetingDuration: 1000, // 1 second
+    
+    // Catch particles
+    catchParticleCount: 15,
+    catchParticleLifespan: 600,
+    catchParticleColor: 0xFFD700, // Gold
+    
+    // Re-engagement
+    reEngageScalePop: 1.3,
+    reEngageFlashDuration: 100,
+    reEngageSparkleCount: 8,
+    
+    // Performance
+    maxSimultaneousParticleEmitters: 10,
+  },
 };
 
 export type GameBalance = typeof gameBalance;
