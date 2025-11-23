@@ -154,6 +154,9 @@ export class RipplePropagationEngine {
       // Linear decay: effect = baseEffect * (1 - distance/maxRadius)
       // Distance 0: 100% effect
       // Distance maxRadius: 0% effect
+      if (this.config.maxRadius === 0) {
+        return 0;
+      }
       const decayFactor = Math.max(0, 1 - (distance / this.config.maxRadius));
       effect *= decayFactor;
     } else if (this.config.decayType === 'exponential') {
