@@ -162,7 +162,7 @@ export class RipplePropagationEngine {
     }
 
     // Add bonus for disinterested fans (re-engagement incentive)
-    if (fan.getIsDisinterested && fan.getIsDisinterested()) {
+    if (fan.getIsDisinterested()) {
       effect += this.config.disinterestedBonus;
     }
 
