@@ -314,7 +314,7 @@ describe('MascotAnalytics', () => {
       // Debug: Check what calculateWaveChance returns
       const sampleFan = fans[0];
       const chanceBefore = 20 * 0.5 + 30 * 0.5 - 70 * 0.3 + 10; // should be 25 + 15 - 21 + 10 = 29 (below 50)
-      const chanceAfter = 80 * 0.5 + 30 * 0.5 - 70 * 0.3 + 10; // should be 40 + 15 - 21 + 10 = 44 (still below 50!)
+      // chanceAfter = 80 * 0.5 + 30 * 0.5 - 70 * 0.3 + 10; // should be 40 + 15 - 21 + 10 = 44 (still below 50!)
       
       // Need higher happiness or lower thirst to cross threshold
       fans.forEach((fan) => {
