@@ -330,6 +330,40 @@ export const gameBalance = {
   },
 
   /**
+   * Mascot movement and behavior configuration
+   */
+  mascot: {
+    // Movement speeds (pixels per second)
+    movementSpeed: 50, // base perimeter patrol speed
+
+    // Activation duration (milliseconds)
+    minDuration: 15000, // 15 seconds minimum active time
+    maxDuration: 20000, // 20 seconds maximum active time
+
+    // Cooldown duration (milliseconds)
+    minCooldown: 45000, // 45 seconds minimum cooldown
+    maxCooldown: 60000, // 60 seconds maximum cooldown
+
+    // Patrol behavior
+    pauseAtCornerMin: 1000, // minimum pause at corners (ms)
+    pauseAtCornerMax: 3000, // maximum pause at corners (ms)
+    cornerPauseProbability: 0.4, // 40% chance to pause at each corner
+
+    // Path behavior
+    edgePadding: 10, // pixels from section edge for perimeter path
+    shortcutProbability: 0.15, // 15% chance to take shortcut across section
+    shortcutSpeedMultiplier: 0.7, // slower when cutting across (70% speed)
+
+    // Auto-rotation mode
+    autoRotationEnabled: false, // default to manual mode
+    autoRotationSectionCooldown: 10000, // 10s cooldown before switching sections
+
+    // Depth factor for targeting (used by t-shirt cannon AI)
+    depthFactorBack: 1.0, // at back of section (best for long throws)
+    depthFactorFrontSides: 0.3, // at front or sides (worse for long throws)
+  },
+
+  /**
    * Grump/difficult terrain configuration
    * Foundation for future grump fan type
    */
