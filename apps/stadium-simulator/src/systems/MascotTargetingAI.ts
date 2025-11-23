@@ -105,7 +105,7 @@ export class MascotTargetingAI {
     let weight = 1.0;
 
     // Apply disinterested multiplier (3x more likely)
-    if (fan.getIsDisinterested && fan.getIsDisinterested()) {
+    if (fan.getIsDisinterested?.()) {
       weight *= gameBalance.mascotCannon.disinterestedTargetingWeight;
     }
 
