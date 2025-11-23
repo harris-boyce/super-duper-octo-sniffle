@@ -337,13 +337,10 @@ export class StadiumScene extends Phaser.Scene {
       });
 
       // Forward mascot analytics to DevPanel
-      mascot.on('mascotAnalytics', (metrics: any) => {
+      mascot.on('mascotAnalytics', (data: { metrics: any, shotRecords: any }) => {
         if (!import.meta.env.PROD) {
           const devPanel = DevPanel.getInstance();
-          const analytics = mascot.getAnalytics();
-          if (analytics) {
-            devPanel.updateMascotAnalytics(metrics, analytics.getShotRecords());
-          }
+          devPanel.updateMascotAnalytics(data.metrics, data.shotRecords);
         }
       });
 
