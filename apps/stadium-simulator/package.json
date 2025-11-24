@@ -13,6 +13,9 @@
     "test:api": "vitest --config vitest.api.config.ts",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
+    "test:watch": "vitest --watch",
+    "test:mascot": "vitest --run --reporter=verbose src/__tests__/systems/RipplePropagationEngine src/__tests__/systems/MascotTargetingAI src/__tests__/systems/MascotAnalytics src/__tests__/components/CatchParticles src/__tests__/components/TargetingIndicator src/__tests__/managers/WaveManager",
+    "test:integration": "vitest --run src/__tests__/integration",
     "audit:security": "./scripts/security-audit.sh",
     "vercel:dev": "vercel dev",
     "vercel:deploy": "vercel --prod"
