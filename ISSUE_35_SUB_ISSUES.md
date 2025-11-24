@@ -554,6 +554,7 @@ public activateSectionWideBoost(): boolean {
   }
   
   // Create and start effect with completion callback
+  // Note: assignedSection is guaranteed non-null by validation above (line 536)
   this.activeSectionWideEffect = new SectionWideBoostEffect(
     this.assignedSection,
     this.scene,
@@ -563,7 +564,7 @@ public activateSectionWideBoost(): boolean {
       // Called when effect completes
       this.emit('sectionWideCompleted', {
         mascotId: this.mascotId,
-        sectionId: this.assignedSection.getId(),  // Already validated non-null at line 536
+        sectionId: this.assignedSection.getId(),  // assignedSection null-checked above
         timestamp: this.scene.time.now
       });
     }
@@ -577,7 +578,7 @@ public activateSectionWideBoost(): boolean {
   // Emit activation event
   this.emit('sectionWideActivated', {
     mascotId: this.mascotId,
-    sectionId: this.assignedSection.getId(),  // Already validated non-null
+    sectionId: this.assignedSection.getId(),  // assignedSection null-checked above
     duration: gameBalance.mascotModes.sectionWide.duration,
     happinessPerSecond: gameBalance.mascotModes.sectionWide.happinessPerSecond,
     timestamp: this.scene.time.now
@@ -890,10 +891,11 @@ private selectTargetsForBoost(): Fan[] {
     return [];
   }
   
+  // assignedSection is guaranteed non-null after check above
   // Reuse existing targeting AI logic
   // Can be parameterized or replaced with boost-specific method if criteria differ
   return this.targetingAI.selectCatchingFans(
-    this.assignedSection!,  // Already validated non-null
+    this.assignedSection,
     this
   );
 }
