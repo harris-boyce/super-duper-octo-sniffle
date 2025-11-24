@@ -401,6 +401,7 @@ import { gameBalance } from '@/config/gameBalance';
  */
 export class SectionWideBoostEffect {
   private section: StadiumSection;
+  private scene: Phaser.Scene;
   private duration: number;
   private happinessPerSecond: number;
   private elapsed: number = 0;
@@ -409,10 +410,12 @@ export class SectionWideBoostEffect {
   
   constructor(
     section: StadiumSection,
+    scene: Phaser.Scene,
     duration: number = gameBalance.mascotModes.sectionWide.duration,
     happinessPerSecond: number = gameBalance.mascotModes.sectionWide.happinessPerSecond
   ) {
     this.section = section;
+    this.scene = scene;
     this.duration = duration;
     this.happinessPerSecond = happinessPerSecond;
   }
@@ -429,27 +432,21 @@ export class SectionWideBoostEffect {
     this.active = true;
     this.elapsed = 0;
     
-    // Get scene reference for Phaser time system
-    const scene = (this.section as any).scene;
-    
     // Apply boost every second using Phaser's time system
     // Better integration with game loop and pause/resume
-    const boostEvent = scene.time.addEvent({
+    this.updateInterval = this.scene.time.addEvent({
       delay: 1000,
       callback: () => {
         this.applyBoost();
         this.elapsed += 1000;
         
         if (this.elapsed >= this.duration) {
-          boostEvent.remove();
+          this.updateInterval?.remove();
           this.complete();
         }
       },
       loop: true
     });
-    
-    // Store event for cleanup
-    this.updateInterval = boostEvent as any;
     
     console.log(`[SectionWideBoost] Started ${this.duration}ms effect (+${this.happinessPerSecond}/sec)`);
   }
@@ -483,13 +480,7 @@ export class SectionWideBoostEffect {
    */
   public stop(): void {
     if (this.updateInterval) {
-      // If using Phaser time event, remove it
-      if (typeof (this.updateInterval as any).remove === 'function') {
-        (this.updateInterval as any).remove();
-      } else {
-        // Fallback for standard interval
-        clearInterval(this.updateInterval as any);
-      }
+      this.updateInterval.remove();
       this.updateInterval = null;
     }
     this.active = false;
@@ -558,6 +549,7 @@ public activateSectionWideBoost(): boolean {
   // Create and start effect
   this.activeSectionWideEffect = new SectionWideBoostEffect(
     this.assignedSection,
+    this.scene,
     gameBalance.mascotModes.sectionWide.duration,
     gameBalance.mascotModes.sectionWide.happinessPerSecond
   );
@@ -765,7 +757,8 @@ test('emits sectionWideActivated and sectionWideCompleted events', async () => {
 This is one of the two core abilities required by Issue #35. It implements the "section-wide slow boost" part of the specification.
 
 **Key Design Points:**
-- Uses `setInterval` for gradual application (1/sec)
+- Uses Phaser's `scene.time.addEvent()` for gradual application (1/sec)
+- Better integration with game loop and pause/resume functionality
 - Separate `SectionWideBoostEffect` class for clean separation
 - Effect can be tracked and cancelled if needed
 - Duration and boost rate configurable via `gameBalance`
