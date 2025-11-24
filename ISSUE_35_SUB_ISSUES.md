@@ -106,7 +106,7 @@ export const gameBalance = {
     targeted: {
       attentionBoost: 20,          // +20 attention
       happinessCost: 10,           // -10 happiness (TRADE)
-      maxTargets: 3,               // 1-3 fans per activation
+      maxTargets: 3,               // Up to 3 fans per activation
       cooldown: 45 * 1000,         // 45 second cooldown
       particleColor: 0xFF0000,     // Red particles
       indicatorType: 'focused_beam'
@@ -563,7 +563,7 @@ public activateSectionWideBoost(): boolean {
       // Called when effect completes
       this.emit('sectionWideCompleted', {
         mascotId: this.mascotId,
-        sectionId: this.assignedSection?.getId(),
+        sectionId: this.assignedSection.getId(),  // Already validated non-null at line 536
         timestamp: this.scene.time.now
       });
     }
@@ -577,7 +577,7 @@ public activateSectionWideBoost(): boolean {
   // Emit activation event
   this.emit('sectionWideActivated', {
     mascotId: this.mascotId,
-    sectionId: this.assignedSection.getId(),
+    sectionId: this.assignedSection.getId(),  // Already validated non-null
     duration: gameBalance.mascotModes.sectionWide.duration,
     happinessPerSecond: gameBalance.mascotModes.sectionWide.happinessPerSecond,
     timestamp: this.scene.time.now
@@ -893,7 +893,7 @@ private selectTargetsForBoost(): Fan[] {
   // Reuse existing targeting AI logic
   // Can be parameterized or replaced with boost-specific method if criteria differ
   return this.targetingAI.selectCatchingFans(
-    this.assignedSection,
+    this.assignedSection!,  // Already validated non-null
     this
   );
 }
