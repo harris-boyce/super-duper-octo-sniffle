@@ -337,11 +337,11 @@ activateTargetedBoost(targets: Fan[]) {
 | Proper feedback | Mode-specific visuals | Generic visuals | ⚠️ Partial |
 
 **Summary:**
-- ✅ Present: 3 features (33%)
-- ⚠️ Partial: 3 features (33%)
-- ❌ Missing: 9 features (100%)
+- ✅ Present: 3 features (20%)
+- ⚠️ Partial: 3 features (20%)
+- ❌ Missing: 9 features (60%)
 
-**Overall Coverage: ~40%**
+**Overall Coverage: ~40%** (considering partial features at 50% completion)
 
 ---
 
@@ -615,8 +615,8 @@ export const gameBalance = {
     // Section-wide slow happiness boost
     sectionWide: {
       happinessPerSecond: 1,      // Gradual increase
-      duration: 20000,             // 20 seconds
-      cooldown: 60000,             // 60 second cooldown
+      duration: 20 * 1000,         // 20 seconds (in milliseconds)
+      cooldown: 60 * 1000,         // 60 second cooldown (in milliseconds)
       particleColor: 0x00FF00,     // Green particles
       indicatorType: 'wide_area'
     },
@@ -626,7 +626,7 @@ export const gameBalance = {
       attentionBoost: 20,          // +20 attention
       happinessCost: 10,           // -10 happiness (TRADE)
       maxTargets: 3,               // 1-3 fans
-      cooldown: 45000,             // 45 second cooldown
+      cooldown: 45 * 1000,         // 45 second cooldown (in milliseconds)
       particleColor: 0xFF0000,     // Red particles
       indicatorType: 'focused_beam'
     }
@@ -775,17 +775,20 @@ Issue #35 will be considered **fully implemented** when:
 
 ### Development Sequence
 
+Assuming ~5 hours of focused development per day:
+
 ```
 Week 1:
-- Day 1-2: Phase 1 (Core Mode System)
-- Day 3: Phase 2 (Section-Wide Boost)
-- Day 4: Phase 3 (Targeted Boost)
+- Day 1: Phase 1 (Core Mode System) - 4-6 hours
+- Day 2: Phase 2 (Section-Wide Boost) + Phase 3 (Targeted Boost) - 4-6 hours
+- Day 3: Phase 4 (Mode Switching UI) + Phase 5 (Visual Differentiation) - 4-5 hours
 
 Week 2:
-- Day 1: Phase 4 (Mode Switching UI)
-- Day 2: Phase 5 (Visual Differentiation)
-- Day 3-4: Phase 6 (Testing & Validation)
+- Day 1-2: Phase 6 (Testing & Validation) - 3-4 hours
 ```
+
+**Total Calendar Time:** 3-4 days  
+**Total Development Hours:** 15-21 hours
 
 ---
 
