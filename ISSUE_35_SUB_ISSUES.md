@@ -86,7 +86,7 @@ export interface MascotModeConfig {
 
 **File:** `apps/stadium-simulator/src/config/gameBalance.ts`
 
-Add to exports:
+Add to gameBalance exports:
 ```typescript
 export const gameBalance = {
   // ... existing config
@@ -405,7 +405,7 @@ export class SectionWideBoostEffect {
   private happinessPerSecond: number;
   private elapsed: number = 0;
   private active: boolean = false;
-  private updateInterval: NodeJS.Timeout | null = null;
+  private updateInterval: Phaser.Time.TimerEvent | null = null;
   
   constructor(
     section: StadiumSection,
@@ -429,15 +429,27 @@ export class SectionWideBoostEffect {
     this.active = true;
     this.elapsed = 0;
     
-    // Apply boost every second
-    this.updateInterval = setInterval(() => {
-      this.applyBoost();
-      this.elapsed += 1000;
-      
-      if (this.elapsed >= this.duration) {
-        this.complete();
-      }
-    }, 1000);
+    // Get scene reference for Phaser time system
+    const scene = (this.section as any).scene;
+    
+    // Apply boost every second using Phaser's time system
+    // Better integration with game loop and pause/resume
+    const boostEvent = scene.time.addEvent({
+      delay: 1000,
+      callback: () => {
+        this.applyBoost();
+        this.elapsed += 1000;
+        
+        if (this.elapsed >= this.duration) {
+          boostEvent.remove();
+          this.complete();
+        }
+      },
+      loop: true
+    });
+    
+    // Store event for cleanup
+    this.updateInterval = boostEvent as any;
     
     console.log(`[SectionWideBoost] Started ${this.duration}ms effect (+${this.happinessPerSecond}/sec)`);
   }
@@ -471,7 +483,13 @@ export class SectionWideBoostEffect {
    */
   public stop(): void {
     if (this.updateInterval) {
-      clearInterval(this.updateInterval);
+      // If using Phaser time event, remove it
+      if (typeof (this.updateInterval as any).remove === 'function') {
+        (this.updateInterval as any).remove();
+      } else {
+        // Fallback for standard interval
+        clearInterval(this.updateInterval as any);
+      }
       this.updateInterval = null;
     }
     this.active = false;
@@ -864,6 +882,12 @@ public activateTargetedBoost(targets?: Fan[]): boolean {
 /**
  * Select targets for targeted boost using existing targeting AI
  * Prefers disinterested fans, respects depth factor
+ * 
+ * NOTE: Currently reuses selectCatchingFans() from cannon system.
+ * Consider adding boost-specific selection criteria if needed:
+ * - Different weighting for disinterested fans
+ * - Different depth factor preferences
+ * - Boost-specific fan state filters
  */
 private selectTargetsForBoost(): Fan[] {
   if (!this.assignedSection) {
@@ -871,6 +895,7 @@ private selectTargetsForBoost(): Fan[] {
   }
   
   // Reuse existing targeting AI logic
+  // Can be parameterized or replaced with boost-specific method if criteria differ
   return this.targetingAI.selectCatchingFans(
     this.assignedSection,
     this
