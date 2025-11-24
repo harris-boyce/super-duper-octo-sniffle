@@ -251,7 +251,7 @@ describe('WaveManager', () => {
     });
 
     it('should track per-section cooldowns', () => {
-      const now = Date.now();
+
       waveManager.recordSectionStart('section-1');
 
       // Section should be in cooldown immediately after
