@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { BaseActorContainer } from './helpers/BaseActor';
+import { CatchParticles } from '@/components/CatchParticles';
 
 /**
  * Fan is a small container composed of two rectangles:
@@ -46,6 +47,12 @@ export class Fan extends BaseActorContainer {
 
     // Choose top color between pale yellow and medium brown
     const topColor = Fan.randomTopColor();
+    this.topOriginalColor = topColor;
+
+    // Pre-calculate disinterested color for performance
+    const tintColor = gameBalance.fanDisengagement.visualTint;
+    const mixRatio = gameBalance.fanDisengagement.tintMixRatio;
+    this.topDisinterestedColor = Fan.mixColors(topColor, tintColor, mixRatio);
 
     // We'll position children so that the local origin (0,0) is at the bottom-most
     // point of the bottom rectangle. This makes container rotation pivot at that point.
@@ -81,7 +88,10 @@ export class Fan extends BaseActorContainer {
     this.bottom.setFillStyle(finalColor);
 
     // Jiggle when t > 0 (handled by intermittent timers that trigger short tweens)
-    this.baseIntensity = t;
+    // Only update baseIntensity if not currently disinterested (to preserve saved state)
+    if (!this.isDisinterested) {
+      this.baseIntensity = t;
+    }
     if (t > 0) {
       this.startJiggleTimer();
     } else {
@@ -460,6 +470,11 @@ export class Fan extends BaseActorContainer {
     const rg = Math.round(ag + (bg - ag) * t);
     const rb = Math.round(ab + (bb - ab) * t);
     return (rr << 16) + (rg << 8) + rb;
+  }
+
+  // Mix two colors together with a given ratio
+  private static mixColors(a: number, b: number, ratio: number): number {
+    return Fan.lerpColor(a, b, ratio);
   }
 
   private static randomTopColor(): number {

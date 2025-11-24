@@ -32,6 +32,20 @@ export const gameBalance = {
   },
 
   /**
+   * Fan disengagement configuration
+   * Controls visual state for disinterested fans (low attention + low happiness)
+   */
+  fanDisengagement: {
+    attentionThreshold: 30, // attention must be below this
+    happinessThreshold: 40, // happiness must be below this
+    visualOpacity: 0.7, // reduced opacity for disinterested fans
+    visualTint: 0x888888, // gray tint for disinterested fans
+    tintMixRatio: 0.5, // ratio for mixing original color with gray tint (0-1)
+    jiggleReduction: 0.5, // reduce jiggle frequency by 50%
+    stateCheckInterval: 500, // ms between state checks (performance optimization)
+  },
+
+  /**
    * Wave strength and momentum configuration
    */
   waveStrength: {
@@ -316,6 +330,40 @@ export const gameBalance = {
   },
 
   /**
+   * Mascot movement and behavior configuration
+   */
+  mascot: {
+    // Movement speeds (pixels per second)
+    movementSpeed: 50, // base perimeter patrol speed
+
+    // Activation duration (milliseconds)
+    minDuration: 15000, // 15 seconds minimum active time
+    maxDuration: 20000, // 20 seconds maximum active time
+
+    // Cooldown duration (milliseconds)
+    minCooldown: 45000, // 45 seconds minimum cooldown
+    maxCooldown: 60000, // 60 seconds maximum cooldown
+
+    // Patrol behavior
+    pauseAtCornerMin: 1000, // minimum pause at corners (ms)
+    pauseAtCornerMax: 3000, // maximum pause at corners (ms)
+    cornerPauseProbability: 0.4, // 40% chance to pause at each corner
+
+    // Path behavior
+    edgePadding: 10, // pixels from section edge for perimeter path
+    shortcutProbability: 0.15, // 15% chance to take shortcut across section
+    shortcutSpeedMultiplier: 0.7, // slower when cutting across (70% speed)
+
+    // Auto-rotation mode
+    autoRotationEnabled: false, // default to manual mode
+    autoRotationSectionCooldown: 10000, // 10s cooldown before switching sections
+
+    // Depth factor for targeting (used by t-shirt cannon AI)
+    depthFactorBack: 1.0, // at back of section (best for long throws)
+    depthFactorFrontSides: 0.3, // at front or sides (worse for long throws)
+  },
+
+  /**
    * Grid pathfinding zone-based costs
    * Used by GridPathfinder for A* movement cost calculation
    */
@@ -470,6 +518,48 @@ export const gameBalance = {
   },
 
   /**
+   * Ripple propagation configuration
+   * Controls cascading engagement effects when fans catch t-shirts
+   */
+  ripplePropagation: {
+    enabled: true, // master toggle for ripple system
+    baseEffect: 40, // attention boost at epicenter (0-100)
+    maxRadius: 4, // maximum Manhattan distance for ripple spread
+    disinterestedBonus: 5, // extra attention boost for disinterested fans
+    decayType: 'linear' as const, // decay function: 'linear' | 'exponential'
+  },
+
+  /**
+   * Mascot T-Shirt Cannon configuration
+   * Controls targeting AI and firing mechanics for mascot t-shirt cannon
+   */
+  mascotCannon: {
+    // Shot timing and quantity
+    minShotsPerActivation: 3, // minimum shots during mascot activation
+    maxShotsPerActivation: 5, // maximum shots during mascot activation
+    minShotInterval: 3000, // minimum ms between shots
+    maxShotInterval: 5000, // maximum ms between shots
+
+    // Global boosts (applied to ALL fans in section on successful hit)
+    globalAttentionBoost: 5, // attention points added to all section fans
+    globalHappinessBoost: 3, // happiness points added to all section fans
+
+    // Targeting mechanics
+    minCatchersPerShot: 1, // minimum fans who catch per shot
+    maxCatchersPerShot: 3, // maximum fans who catch per shot (AOE cluster)
+    disinterestedTargetingWeight: 3.0, // multiplier for disinterested fan selection (3x more likely)
+    distanceWeight: 0.5, // weight for distance from mascot (farther = higher priority)
+
+    // Timing and animation
+    chargeDuration: 1500, // ms mascot pauses to charge before firing
+    targetingPreviewDuration: 1000, // ms targeting indicator shown before fire
+    projectileFlightTime: 1000, // ms delay before effects apply (projectile travel time)
+
+    // Performance
+    maxSimultaneousMascots: 5, // maximum mascots that can fire simultaneously
+  },
+
+  /**
    * Visual environment configuration
    */
   visual: {
@@ -480,6 +570,41 @@ export const gameBalance = {
     stairsDepth: -50,
     groundDepth: -100,
     skyDepth: -101,
+  },
+
+  /**
+   * Visual effects configuration for particles, indicators, and animations
+   */
+  visuals: {
+    // Targeting indicator
+    targetingReticleRadius: 25,
+    targetingReticleColor: 0xFFFF00, // Yellow
+    targetingDuration: 1000, // 1 second
+    
+    // Catch particles
+    catchParticleCount: 15,
+    catchParticleLifespan: 600,
+    catchParticleColor: 0xFFD700, // Gold
+    
+    // Re-engagement
+    reEngageScalePop: 1.3,
+    reEngageFlashDuration: 100,
+    reEngageFlashColor: 0xFFFFFF, // White
+    reEngageSparkleCount: 8,
+    
+    // Performance
+    maxSimultaneousParticleEmitters: 10,
+  },
+
+  /**
+   * Mascot analytics configuration
+   * Controls tracking and reporting of mascot effectiveness and wave impact
+   */
+  mascotAnalytics: {
+    participationThreshold: 50, // % chance = "likely to participate"
+    reEngagementAttentionThreshold: 30, // attention threshold for re-engagement
+    reportingEnabled: true, // Toggle console reports
+    trackingWindowMs: 30000, // 30 seconds after mascot
   },
 };
 

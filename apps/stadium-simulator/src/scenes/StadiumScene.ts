@@ -4,8 +4,10 @@ import { WaveManager } from '@/managers/WaveManager';
 import { AIManager } from '@/managers/AIManager';
 import { StadiumSection } from '@/sprites/StadiumSection';
 import { Vendor } from '@/sprites/Vendor';
+import { Mascot } from '@/sprites/Mascot';
 import { VendorState } from '@/managers/interfaces';
 import { AnnouncerService } from '@/managers/AnnouncerService';
+import { DevPanel } from '@/ui/DevPanel';
 
 import { gameBalance } from '@/config/gameBalance';
 import { ActorRegistry } from '@/actors/base/ActorRegistry';
@@ -19,6 +21,7 @@ import { GridManager } from '@/managers/GridManager';
 import { LevelService } from '@/services/LevelService';
 import { GridOverlay } from '@/scenes/GridOverlay';
 import { PathfindingService } from '@/services/PathfindingService';
+import { TargetingIndicator } from '@/components/TargetingIndicator';
 
 /**
  * StadiumScene renders the visual state of the stadium simulator
@@ -39,6 +42,10 @@ export class StadiumScene extends Phaser.Scene {
   private sessionTimerText?: Phaser.GameObjects.Text;
   private sections: StadiumSection[] = [];
   private vendorSprites: Map<number, Vendor> = new Map(); // Track vendor visual sprites
+  private mascots: Mascot[] = []; // Track mascot sprites
+  private mascotSectionMap: Map<string, Mascot> = new Map(); // Track which mascot is in which section
+  private autoRotationMode: boolean = false; // Auto-rotation mode for mascots
+  private mascotKeys: Phaser.Input.Keyboard.Key[] = []; // Track keyboard keys for cleanup
   private demoMode: boolean = false;
   private debugMode: boolean = false;
   private successStreak: number = 0;
@@ -51,6 +58,7 @@ export class StadiumScene extends Phaser.Scene {
   private skyboxActor?: any;
   private groundActor?: any;
   private gridOverlay?: GridOverlay;
+  public targetingIndicator!: TargetingIndicator;
   private pathfindingService?: PathfindingService;
 
   constructor() {
@@ -278,6 +286,14 @@ export class StadiumScene extends Phaser.Scene {
     // Create wave strength meter (will be shown on wave start)
     this.createWaveStrengthMeter();
 
+    // Initialize targeting indicator for mascot visual feedback
+    // Note: Requires 'particle' texture created by MenuScene.preload()
+    if (!this.textures.exists('particle')) {
+      console.warn('[StadiumScene] Particle texture not found, creating fallback');
+      this.createParticleTexture();
+    }
+    this.targetingIndicator = new TargetingIndicator(this);
+
     // Create GridOverlay for debug rendering (must be in same scene as camera)
     if (this.gridManager) {
       this.gridOverlay = new GridOverlay(this, this.gridManager);
@@ -312,7 +328,6 @@ export class StadiumScene extends Phaser.Scene {
             this.gridOverlay.toggleVendorPaths();
           }
         });
-
         // Z key: Toggle zone visualization (only if grid visible)
         keyboard.addKey('Z').on('down', () => {
           if (this.gridOverlay) {
@@ -335,6 +350,49 @@ export class StadiumScene extends Phaser.Scene {
         });
       }
     }
+
+    // Spawn mascots (one per section initially, inactive)
+    this.sections.forEach((section, index) => {
+      const mascot = new Mascot(this, section.x, section.y);
+      mascot.setVisible(false); // Start hidden
+      this.mascots.push(mascot);
+
+      // Attach cannon event listeners for debugging
+      mascot.on('cannonCharging', (data: any) => {
+        console.log(`[Cannon] Mascot charging, targets: ${data.catchers.length}`);
+      });
+
+      mascot.on('cannonFired', (data: any) => {
+        console.log(`[Cannon] Mascot fired at ${data.catchers.length} fans`);
+      });
+
+      mascot.on('cannonShot', (data: any) => {
+        console.log(
+          `[Cannon] Shot complete! ${data.catchers.length} catchers, ` +
+          `${data.combinedEffects.size} fans affected by ripple`
+        );
+      });
+
+      mascot.on('cannonMissed', (data: any) => {
+        console.log(`[Cannon] Shot missed - ${data.reason}`);
+      });
+
+      // Forward mascot analytics to DevPanel
+      mascot.on('mascotAnalytics', (data: { metrics: any, shotRecords: any }) => {
+        if (!import.meta.env.PROD) {
+          const devPanel = DevPanel.getInstance();
+          devPanel.updateMascotAnalytics(data.metrics, data.shotRecords);
+        }
+      });
+
+      console.log(`[Mascot] Created mascot ${index} for section ${section.getId()}`);
+    });
+
+    // Setup mascot keyboard controls
+    this.setupMascotKeyboardControls();
+
+    // Setup cleanup on scene shutdown
+    this.events.once('shutdown', this.cleanupMascotControls, this);
 
     // Notify WorldScene that initialization is complete
     this.events.emit('stadiumReady', { aiManager: this.aiManager });
@@ -700,6 +758,12 @@ export class StadiumScene extends Phaser.Scene {
           this.gameState.updateSectionStat(sectionData.id, 'attention', aggregate.attention);
         });
       }
+
+      // Check disinterested state for all fans (~500ms intervals)
+      // This uses time-based throttling to avoid checking every frame
+      this.sections.forEach(section => {
+        section.getFans().forEach(fan => fan.checkDisinterestedState());
+      });
     }
 
     // Update actor registry (for autonomous actor behaviors)
@@ -707,9 +771,12 @@ export class StadiumScene extends Phaser.Scene {
 
     // Update vendor manager
     this.aiManager.update(delta);
-    
+
     // Update vendor visual positions
     this.updateVendorPositions();
+
+    // Update mascot positions and states
+    this.updateMascots(delta);
 
     // Tick wave sprite movement and events (sprite-driven propagation)
     this.waveManager.update(delta);
@@ -1352,6 +1419,77 @@ export class StadiumScene extends Phaser.Scene {
   }
 
   /**
+   * Setup mascot keyboard controls
+   */
+  private setupMascotKeyboardControls(): void {
+    const keyboard = this.input.keyboard;
+    if (!keyboard) return;
+
+    // M key: Activate first available mascot in first available section
+    const mKey = keyboard.addKey('M');
+    this.mascotKeys.push(mKey);
+    mKey.on('down', () => {
+      const availableMascot = this.mascots.find(m => m.canActivate());
+      const availableSection = this.sections.find(s => !this.mascotSectionMap.has(s.getId()));
+
+      if (availableMascot && availableSection) {
+        availableMascot.activateInSection(availableSection, 'manual');
+        this.mascotSectionMap.set(availableSection.getId(), availableMascot);
+        console.log(`[Mascot] Activated mascot in section ${availableSection.getId()}`);
+      } else {
+        console.log('[Mascot] No available mascot or section');
+      }
+    });
+
+    // Number keys (1-4): Assign mascot to specific section by index
+    for (let i = 1; i <= 4; i++) {
+      const numKey = keyboard.addKey(`${i}`);
+      this.mascotKeys.push(numKey);
+      numKey.on('down', () => {
+        const sectionIndex = i - 1;
+        if (sectionIndex >= this.sections.length) return;
+
+        const section = this.sections[sectionIndex];
+        const availableMascot = this.mascots.find(m => m.canActivate());
+
+        // Check if section already has a mascot
+        if (this.mascotSectionMap.has(section.getId())) {
+          console.log(`[Mascot] Section ${section.getId()} already has a mascot`);
+          return;
+        }
+
+        if (availableMascot) {
+          availableMascot.activateInSection(section, 'manual');
+          this.mascotSectionMap.set(section.getId(), availableMascot);
+          console.log(`[Mascot] Activated mascot in section ${section.getId()} (index ${sectionIndex})`);
+        } else {
+          console.log('[Mascot] No available mascot (all in cooldown or active)');
+        }
+      });
+    }
+
+    // A key: Toggle auto-rotation mode for all mascots
+    const aKey = keyboard.addKey('A');
+    this.mascotKeys.push(aKey);
+    aKey.on('down', () => {
+      this.autoRotationMode = !this.autoRotationMode;
+      this.mascots.forEach(m => {
+        m.setMovementMode(this.autoRotationMode ? 'auto' : 'manual');
+      });
+      console.log(`[Mascot] Auto-rotation mode: ${this.autoRotationMode ? 'ON' : 'OFF'}`);
+    });
+  }
+
+  /**
+   * Clean up keyboard listeners on scene shutdown
+   */
+  private cleanupMascotControls(): void {
+    // Remove all mascot keyboard listeners
+    this.mascotKeys.forEach(key => key.off('down'));
+    this.mascotKeys = [];
+  }
+
+  /**
    * Update vendor sprite positions to match their instance positions
    */
   private updateVendorPositions(): void {
@@ -1364,6 +1502,46 @@ export class StadiumScene extends Phaser.Scene {
 
       // Update sprite state to match vendor state
       sprite.setMovementState(instance.state);
+    }
+  }
+
+  /**
+   * Update mascot positions and handle deactivation cleanup
+   */
+  private updateMascots(delta: number): void {
+    this.mascots.forEach(mascot => {
+      mascot.update(delta);
+
+      // Clean up section map when mascot deactivates
+      if (!mascot.isPatrolling() && mascot.getAssignedSection()) {
+        const sectionId = mascot.getAssignedSection()?.getId();
+        if (sectionId && this.mascotSectionMap.get(sectionId) === mascot) {
+          this.mascotSectionMap.delete(sectionId);
+          mascot.clearSection();
+        }
+      }
+
+      // Auto-rotation: automatically move mascot to next section
+      if (gameBalance.mascot.autoRotationEnabled &&
+          mascot.getMovementMode() === 'auto' &&
+          mascot.canActivate() &&
+          mascot.getAutoRotationCooldown() <= 0) {
+        this.autoRotateMascot(mascot);
+      }
+    });
+  }
+
+  /**
+   * Auto-rotate a mascot to the next available section
+   */
+  private autoRotateMascot(mascot: Mascot): void {
+    // Find next available section (sequential rotation)
+    const availableSection = this.sections.find(s => !this.mascotSectionMap.has(s.getId()));
+
+    if (availableSection) {
+      mascot.activateInSection(availableSection, 'auto');
+      this.mascotSectionMap.set(availableSection.getId(), mascot);
+      console.log(`[Mascot Auto-Rotation] Activated mascot in section ${availableSection.getId()}`);
     }
   }
 
@@ -1440,6 +1618,18 @@ export class StadiumScene extends Phaser.Scene {
         ground.setAlpha(alpha);
       }
     }
+  }
+
+  /**
+   * Create particle texture (fallback if not created by MenuScene)
+   * 4x4 white square for retro aesthetic
+   */
+  private createParticleTexture(): void {
+    const graphics = this.add.graphics();
+    graphics.fillStyle(0xFFFFFF, 1.0);
+    graphics.fillRect(0, 0, 4, 4);
+    graphics.generateTexture('particle', 4, 4);
+    graphics.destroy();
   }
 }
 
