@@ -1,0 +1,307 @@
+/**
+ * Statistical Validation Tests for Mascot System
+ *
+ * STATUS: STUBBED - Not implemented in MVP
+ * PRIORITY: Low
+ * EFFORT: 2 days
+ *
+ * These tests validate probabilistic behaviors through large sample sizes:
+ * - Disinterested fan targeting: 60-90% over 1000 trials
+ * - Wave participation improvement: 10-20% average over 100 trials
+ * - Shot count distribution: Uniform 3-5 shots
+ *
+ * To implement:
+ * 1. Remove .stub extension
+ * 2. Implement test bodies with high iteration counts
+ * 3. Run: npm test -- mascot-statistical (may take several minutes)
+ * 4. Consider running as separate suite (not on every test run)
+ */
+
+import { describe, it, expect } from 'vitest';
+// import { MascotTargetingAI } from '@/systems/MascotTargetingAI';
+// import { Mascot } from '@/sprites/Mascot';
+
+describe.skip('Mascot Statistical Validation', () => {
+  /**
+   * TODO: Validate disinterested fan targeting rate
+   * Target: 60-90% of catches should be disinterested fans over 1000 trials
+   *
+   * Implementation:
+   * 1. Create section with 50% disinterested fans
+   * 2. Run 1000 targeting trials
+   * 3. Count disinterested vs normal catches
+   * 4. Assert rate within 60-90% range
+   * 5. Log distribution for analysis
+   */
+  it('disinterested fans caught 60-90% of time (1000 trials)', () => {
+    // const ai = new MascotTargetingAI();
+    // const section = createMixedSection({
+    //   total: 30,
+    //   disinterestedCount: 15  // 50% disinterested
+    // });
+    //
+    // const trials = 1000;
+    // let totalCatches = 0;
+    // let disinterestedCatches = 0;
+    //
+    // for (let i = 0; i < trials; i++) {
+    //   ai.reset();
+    //   const catchers = ai.selectCatchingFans(section, 0.5);
+    //
+    //   catchers.forEach(catcher => {
+    //     totalCatches++;
+    //     if (catcher.getIsDisinterested()) {
+    //       disinterestedCatches++;
+    //     }
+    //   });
+    // }
+    //
+    // const percentDisinterested = (disinterestedCatches / totalCatches) * 100;
+    //
+    // console.log(`Disinterested catch rate: ${percentDisinterested.toFixed(1)}%`);
+    // console.log(`Sample: ${disinterestedCatches}/${totalCatches}`);
+    //
+    // expect(percentDisinterested).toBeGreaterThan(60);
+    // expect(percentDisinterested).toBeLessThan(90);
+  });
+
+  /**
+   * TODO: Validate wave participation improvement consistency
+   * Target: 10-20% average improvement over 100 trials
+   *
+   * Implementation:
+   * 1. Create struggling section (30-40% baseline participation)
+   * 2. Run 100 full mascot activation cycles
+   * 3. Measure baseline and post-mascot participation each time
+   * 4. Calculate average improvement
+   * 5. Assert average within 10-20% range
+   * 6. Check standard deviation < 5%
+   */
+  it('participation improves 10-20% consistently (100 trials)', async () => {
+    // const trials = 100;
+    // const improvements: number[] = [];
+    //
+    // for (let trial = 0; trial < trials; trial++) {
+    //   const scene = createRealScene();
+    //   const mascot = new Mascot(scene, 0, 0);
+    //   const section = createStrugglingSection(); // 30-40% baseline
+    //
+    //   // Measure baseline
+    //   const baseline = measureParticipationRate(section);
+    //
+    //   // Apply mascot
+    //   mascot.activateInSection(section);
+    //   await waitForFullActivation(mascot);
+    //
+    //   // Measure result
+    //   const result = measureParticipationRate(section);
+    //
+    //   improvements.push((result - baseline) * 100);
+    // }
+    //
+    // const avgImprovement = average(improvements);
+    // const stdDev = standardDeviation(improvements);
+    // const min = Math.min(...improvements);
+    // const max = Math.max(...improvements);
+    //
+    // console.log(`Avg improvement: ${avgImprovement.toFixed(1)}%`);
+    // console.log(`Std dev: ${stdDev.toFixed(1)}%`);
+    // console.log(`Range: ${min.toFixed(1)}% - ${max.toFixed(1)}%`);
+    //
+    // expect(avgImprovement).toBeGreaterThan(10);
+    // expect(avgImprovement).toBeLessThan(30);
+    // expect(stdDev).toBeLessThan(5); // Low variance
+  }, 60000); // 1 minute timeout
+
+  /**
+   * TODO: Validate shot count distribution
+   * Target: Uniform distribution across 3-5 shots
+   *
+   * Implementation:
+   * 1. Run 1000 mascot activations
+   * 2. Record shot count for each
+   * 3. Count occurrences of 3, 4, 5 shots
+   * 4. Assert each appears ~333 times (±50)
+   * 5. Chi-square test for uniformity
+   */
+  it('shot count distribution is uniform (1000 trials)', () => {
+    // const mascot = new Mascot(createMockScene(), 0, 0);
+    // const section = createSection();
+    //
+    // const shotCounts = { 3: 0, 4: 0, 5: 0 };
+    //
+    // for (let i = 0; i < 1000; i++) {
+    //   mascot.activateInSection(section);
+    //   const shots = mascot.getShotsRemaining();
+    //   shotCounts[shots as 3 | 4 | 5]++;
+    //
+    //   // Reset for next trial
+    //   mascot.forceDeactivate();
+    //   mascot.clearCooldown();
+    // }
+    //
+    // console.log('Shot distribution:', shotCounts);
+    //
+    // // Each should appear ~333 times with some variance
+    // expect(shotCounts[3]).toBeGreaterThan(250);
+    //   expect(shotCounts[3]).toBeLessThan(400);
+    // expect(shotCounts[4]).toBeGreaterThan(250);
+    // expect(shotCounts[4]).toBeLessThan(400);
+    // expect(shotCounts[5]).toBeGreaterThan(250);
+    // expect(shotCounts[5]).toBeLessThan(400);
+    //
+    // // Chi-square test for uniformity
+    // const chiSquare = calculateChiSquare(shotCounts, 333.33);
+    // expect(chiSquare).toBeLessThan(5.99); // p < 0.05 for df=2
+  });
+
+  /**
+   * TODO: Validate ripple effect distribution
+   * Target: Gaussian distribution around epicenter
+   *
+   * Implementation:
+   * 1. Run 100 ripple calculations
+   * 2. Record boost amounts by distance from epicenter
+   * 3. Verify linear decay (distance 1: ~30, distance 2: ~20, etc.)
+   * 4. Check variance within acceptable range
+   */
+  it('ripple effects follow expected distribution', () => {
+    // const engine = new RipplePropagationEngine();
+    // const section = createLargeSection(200);
+    // const epicenter = section.getFans()[100];
+    //
+    // const boostsByDistance = new Map<number, number[]>();
+    //
+    // for (let i = 0; i < 100; i++) {
+    //   const ripple = engine.calculateRipple(epicenter, section);
+    //
+    //   ripple.affectedFans.forEach((boost, fan) => {
+    //     const distance = manhattanDistance(epicenter, fan);
+    //     if (!boostsByDistance.has(distance)) {
+    //       boostsByDistance.set(distance, []);
+    //     }
+    //     boostsByDistance.get(distance)!.push(boost);
+    //   });
+    // }
+    //
+    // // Verify linear decay
+    // boostsByDistance.forEach((boosts, distance) => {
+    //   const avgBoost = average(boosts);
+    //   const expectedBoost = 40 * (1 - distance / 4); // baseEffect * decay
+    //
+    //   expect(avgBoost).toBeCloseTo(expectedBoost, 2);
+    // });
+  });
+
+  /**
+   * TODO: Validate depth factor influence
+   * Target: Back position (1.0) selects 2x more distant fans than front (0.3)
+   *
+   * Implementation:
+   * 1. Create section with fans at varying distances
+   * 2. Run 500 trials with depthFactor = 1.0 (back)
+   * 3. Run 500 trials with depthFactor = 0.3 (front)
+    * 4. Compare average distance of selected fans
+   * 5. Assert back position selects significantly more distant fans
+   */
+  it('depth factor influences fan selection distance', () => {
+    // const ai = new MascotTargetingAI();
+    // const section = createLargeSection(100);
+    //
+    // const backDistances: number[] = [];
+    // const frontDistances: number[] = [];
+    //
+    // // Back position trials
+    // for (let i = 0; i < 500; i++) {
+    //   ai.reset();
+    //   const catchers = ai.selectCatchingFans(section, 1.0); // back
+    //   catchers.forEach(catcher => {
+    //     backDistances.push(calculateDistanceFromFront(catcher));
+    //   });
+    // }
+    //
+    // // Front position trials
+    // for (let i = 0; i < 500; i++) {
+    //   ai.reset();
+    //   const catchers = ai.selectCatchingFans(section, 0.3); // front
+    //   catchers.forEach(catcher => {
+    //     frontDistances.push(calculateDistanceFromFront(catcher));
+    //   });
+    // }
+    //
+    // const avgBackDistance = average(backDistances);
+    // const avgFrontDistance = average(frontDistances);
+    //
+    // console.log(`Back avg distance: ${avgBackDistance.toFixed(1)}`);
+    // console.log(`Front avg distance: ${avgFrontDistance.toFixed(1)}`);
+    //
+    // // Back should select fans significantly farther away
+    // expect(avgBackDistance).toBeGreaterThan(avgFrontDistance * 1.5);
+  });
+
+  /**
+   * TODO: Long-term consistency test
+   * Target: System remains stable over extended play
+   *
+   * Implementation:
+   * 1. Simulate 100 full game sessions
+   * 2. Each session: 20-30 mascot activations
+   * 3. Track cumulative metrics
+   * 4. Verify no drift or degradation
+   */
+  it('system remains consistent over extended play (100 sessions)', async () => {
+    // const sessions = 100;
+    // const sessionMetrics: SessionMetrics[] = [];
+    //
+    // for (let s = 0; s < sessions; s++) {
+    //   const scene = createRealScene();
+    //   const mascot = new Mascot(scene, 0, 0);
+    //   const section = createSection();
+    //
+    //   const metrics = {
+    //     totalActivations: 0,
+    //     totalImprovements: [],
+    //     targetingAccuracy: [],
+    //   };
+    //
+    //   // Simulate 20-30 activations per session
+    //   const activations = 20 + Math.floor(Math.random() * 11);
+    //   for (let a = 0; a < activations; a++) {
+    //     const baseline = measureParticipationRate(section);
+    //     mascot.activateInSection(section);
+    //     await waitForFullActivation(mascot);
+    //     const result = measureParticipationRate(section);
+    //
+    //     metrics.totalImprovements.push(result - baseline);
+    //     // ... track other metrics
+    //   }
+    //
+    //   sessionMetrics.push(metrics);
+    // }
+    //
+    // // Verify consistency across sessions
+    // const avgImprovements = sessionMetrics.map(m =>
+    //   average(m.totalImprovements)
+    // );
+    //
+    // const overallAvg = average(avgImprovements);
+    // const stdDev = standardDeviation(avgImprovements);
+    //
+    // expect(stdDev).toBeLessThan(3); // Low variance between sessions
+    // expect(overallAvg).toBeGreaterThan(10);
+    // expect(overallAvg).toBeLessThan(30);
+  }, 300000); // 5 minute timeout
+});
+
+/**
+ * Statistical Helper Functions (to be implemented)
+ */
+
+// function average(numbers: number[]): number { /* ... */ }
+// function standardDeviation(numbers: number[]): number { /* ... */ }
+// function calculateChiSquare(observed: any, expected: number): number { /* ... */ }
+// function manhattanDistance(fan1: Fan, fan2: Fan): number { /* ... */ }
+// function createMixedSection(config: any) { /* ... */ }
+// function createStrugglingSection() { /* ... */ }
+// function measureParticipationRate(section: any): number { /* ... */ }
+// function waitForFullActivation(mascot: Mascot): Promise<void> { /* ... */ }
