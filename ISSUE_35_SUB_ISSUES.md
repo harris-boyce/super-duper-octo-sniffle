@@ -407,17 +407,20 @@ export class SectionWideBoostEffect {
   private elapsed: number = 0;
   private active: boolean = false;
   private updateInterval: Phaser.Time.TimerEvent | null = null;
+  private onComplete?: () => void;
   
   constructor(
     section: StadiumSection,
     scene: Phaser.Scene,
     duration: number = gameBalance.mascotModes.sectionWide.duration,
-    happinessPerSecond: number = gameBalance.mascotModes.sectionWide.happinessPerSecond
+    happinessPerSecond: number = gameBalance.mascotModes.sectionWide.happinessPerSecond,
+    onComplete?: () => void
   ) {
     this.section = section;
     this.scene = scene;
     this.duration = duration;
     this.happinessPerSecond = happinessPerSecond;
+    this.onComplete = onComplete;
   }
   
   /**
@@ -441,7 +444,6 @@ export class SectionWideBoostEffect {
         this.elapsed += 1000;
         
         if (this.elapsed >= this.duration) {
-          this.updateInterval?.remove();
           this.complete();
         }
       },
@@ -473,6 +475,11 @@ export class SectionWideBoostEffect {
   private complete(): void {
     this.stop();
     console.log(`[SectionWideBoost] Completed after ${this.elapsed}ms`);
+    
+    // Call completion callback if provided
+    if (this.onComplete) {
+      this.onComplete();
+    }
   }
   
   /**
@@ -546,32 +553,14 @@ public activateSectionWideBoost(): boolean {
     return false;
   }
   
-  // Create and start effect
+  // Create and start effect with completion callback
   this.activeSectionWideEffect = new SectionWideBoostEffect(
     this.assignedSection,
     this.scene,
     gameBalance.mascotModes.sectionWide.duration,
-    gameBalance.mascotModes.sectionWide.happinessPerSecond
-  );
-  
-  this.activeSectionWideEffect.start();
-  
-  // Set cooldown
-  this.sectionWideCooldown = gameBalance.mascotModes.sectionWide.cooldown;
-  
-  // Emit event
-  this.emit('sectionWideActivated', {
-    mascotId: this.mascotId,
-    sectionId: this.assignedSection.getId(),
-    duration: gameBalance.mascotModes.sectionWide.duration,
-    happinessPerSecond: gameBalance.mascotModes.sectionWide.happinessPerSecond,
-    timestamp: this.scene.time.now
-  });
-  
-  // Schedule completion event
-  this.scene.time.delayedCall(
-    gameBalance.mascotModes.sectionWide.duration,
+    gameBalance.mascotModes.sectionWide.happinessPerSecond,
     () => {
+      // Called when effect completes
       this.emit('sectionWideCompleted', {
         mascotId: this.mascotId,
         sectionId: this.assignedSection?.getId(),
@@ -579,6 +568,20 @@ public activateSectionWideBoost(): boolean {
       });
     }
   );
+  
+  this.activeSectionWideEffect.start();
+  
+  // Set cooldown
+  this.sectionWideCooldown = gameBalance.mascotModes.sectionWide.cooldown;
+  
+  // Emit activation event
+  this.emit('sectionWideActivated', {
+    mascotId: this.mascotId,
+    sectionId: this.assignedSection.getId(),
+    duration: gameBalance.mascotModes.sectionWide.duration,
+    happinessPerSecond: gameBalance.mascotModes.sectionWide.happinessPerSecond,
+    timestamp: this.scene.time.now
+  });
   
   console.log(`[Mascot ${this.mascotId}] Section-wide boost activated`);
   return true;
