@@ -161,8 +161,8 @@ export const gameBalance = {
    * Wave timing configuration (all in milliseconds, converted to seconds where needed)
    */
   waveTiming: {
-    triggerCountdown: 5000, // 10 seconds before wave fires
-    baseCooldown: 15000, // 10 seconds between waves
+    triggerCountdown: 5000, // 5 seconds before wave fires
+    baseCooldown: 15000, // 15 seconds between waves
     successRefund: 5000, // refund this much if all sections succeed
     columnDelay: 44, // ms between column animations
     rowDelay: 6, // ms between row animations within column
@@ -229,7 +229,12 @@ export const gameBalance = {
     /**
      * Calculate maximum possible waves for a session duration.
      * 
-     * Formula: sessionDuration / (triggerCountdown + baseCooldown + avgWaveLength)
+     * Formula: Math.ceil(sessionDuration / totalCycleTime)
+     * where totalCycleTime = triggerCountdown + baseCooldown + avgWaveLength
+     * 
+     * Example calculation for 100s session:
+     * - Total cycle time = 5000 + 15000 + 2000 = 22000ms
+     * - Max waves = Math.ceil(100000 / 22000) = 5 waves
      * 
      * Assumptions:
      * - Average wave takes ~2000ms to propagate across all sections
@@ -242,9 +247,12 @@ export const gameBalance = {
      */
     calculateMaxWavesEstimate(sessionDurationMs: number): number {
       const waveTiming = gameBalance.waveTiming;
+      // Average time for a wave to complete propagation across all sections
+      // This is an empirical estimate based on typical wave behavior
       const avgWaveLength = 2000; // ~2 seconds for wave to complete
       
       // Total time per wave cycle (worst case, no success refunds)
+      // = countdown + cooldown + propagation time
       const totalCycleTime = waveTiming.triggerCountdown + waveTiming.baseCooldown + avgWaveLength;
       
       // Calculate max waves (round up since partial waves still count)
