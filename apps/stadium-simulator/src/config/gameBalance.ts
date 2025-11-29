@@ -225,9 +225,31 @@ export const gameBalance = {
     // Points awarded for various achievements
     basePointsPerWave: 100,
     participationBonus: 10, // per percentage point of participation
-    // Estimated max waves based on session duration and wave timing
-    // Calculated as: Math.ceil(runModeDuration / (baseCooldown + triggerCountdown))
-    maxWavesEstimate: 8, // ~100s session / ~12.5s per wave cycle
+    
+    /**
+     * Calculate maximum possible waves for a session duration.
+     * 
+     * Formula: sessionDuration / (triggerCountdown + baseCooldown + avgWaveLength)
+     * 
+     * Assumptions:
+     * - Average wave takes ~2000ms to propagate across all sections
+     * - Countdown time: 5000ms (from waveTiming.triggerCountdown)
+     * - Cooldown time: 15000ms (from waveTiming.baseCooldown)
+     * - Success refund: -5000ms (from waveTiming.successRefund, not included in worst case)
+     * 
+     * @param sessionDurationMs - Total session duration in milliseconds
+     * @returns Estimated maximum waves achievable (rounded up)
+     */
+    calculateMaxWavesEstimate(sessionDurationMs: number): number {
+      const waveTiming = gameBalance.waveTiming;
+      const avgWaveLength = 2000; // ~2 seconds for wave to complete
+      
+      // Total time per wave cycle (worst case, no success refunds)
+      const totalCycleTime = waveTiming.triggerCountdown + waveTiming.baseCooldown + avgWaveLength;
+      
+      // Calculate max waves (round up since partial waves still count)
+      return Math.ceil(sessionDurationMs / totalCycleTime);
+    },
   },
 
   /**
