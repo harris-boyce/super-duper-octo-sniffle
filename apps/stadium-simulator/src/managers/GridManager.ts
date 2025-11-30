@@ -494,10 +494,10 @@ export class GridManager extends BaseManager {
   public loadZoneConfig(config: StadiumSceneConfig): void {
     if (DEBUG_PATHFIND) {
       console.log('[GridManager] loadZoneConfig called with:', {
-        cellRanges: config.cellRanges.length,
-        cells: config.cells.length,
-        sections: config.sections.length,
-        stairs: config.stairs.length,
+        cellRanges: config.cellRanges?.length ?? 0,
+        cells: config.cells?.length ?? 0,
+        sections: config.sections?.length ?? 0,
+        stairs: config.stairs?.length ?? 0,
       });
     }
 
