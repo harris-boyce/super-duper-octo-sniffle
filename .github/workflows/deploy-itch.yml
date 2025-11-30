@@ -95,5 +95,7 @@ jobs:
         run: |
           echo "## 🎮 Deployment Complete!" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Project**: ${{ secrets.ITCH_ACCOUNT }}/${{ vars.ITCH_PROJECT }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Game URL**: https://${{ secrets.ITCH_ACCOUNT }}.itch.io/${{ vars.ITCH_PROJECT }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Channel**: html5" >> $GITHUB_STEP_SUMMARY
           echo "- **Version**: ${{ inputs.version || github.sha }}" >> $GITHUB_STEP_SUMMARY
