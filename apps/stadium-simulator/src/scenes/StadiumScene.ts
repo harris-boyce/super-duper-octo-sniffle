@@ -25,9 +25,11 @@ import { LevelService } from '@/services/LevelService';
 import { GridOverlay } from '@/scenes/GridOverlay';
 import { PathfindingService } from '@/services/PathfindingService';
 import { TargetingIndicator } from '@/components/TargetingIndicator';
+import { CatchParticles } from '@/components/CatchParticles';
 import { TargetingReticle } from '@/ui/TargetingReticle';
 import { OverlayManager } from '@/managers/OverlayManager';
 import PersonalityIntegrationManager from '@/systems/PersonalityIntegrationManager';
+import { RipplePropagationEngine } from '@/systems/RipplePropagationEngine';
 
 /**
  * StadiumScene renders the visual state of the stadium simulator
@@ -65,6 +67,7 @@ export class StadiumScene extends Phaser.Scene {
   private groundActor?: any;
   private gridOverlay?: GridOverlay;
   public targetingIndicator!: TargetingIndicator;
+  private rippleEngine!: RipplePropagationEngine;
   private pathfindingService?: PathfindingService;
   private targetingReticle?: TargetingReticle;
   private vendorTargetingActive: number | null = null; // Vendor ID currently being targeted
@@ -318,6 +321,9 @@ export class StadiumScene extends Phaser.Scene {
     }
     this.targetingIndicator = new TargetingIndicator(this);
 
+    // Initialize ripple propagation engine for mascot effects
+    this.rippleEngine = new RipplePropagationEngine();
+
     // Create GridOverlay for debug rendering (must be in same scene as camera)
     if (this.gridManager) {
       this.gridOverlay = new GridOverlay(this, this.gridManager);
@@ -394,7 +400,9 @@ export class StadiumScene extends Phaser.Scene {
       this.actorRegistry.register(mascotActor);
       this.aiManager.registerMascot(mascotActor);
       this.mascotActors.push(mascotActor);
-      console.log(`[MascotActor] Registered mascot actor ${actorId} for section ${section.getId()}`);
+      // Wire mascot events for stat effects and visual feedback
+      this.wireMascotEvents(mascotActor);
+      console.log(`[MascotActor] Registered and wired events for ${actorId} in section ${section.getId()}`);
     });
 
     // Setup mascot keyboard controls
@@ -1574,6 +1582,104 @@ export class StadiumScene extends Phaser.Scene {
       this.mascotActors.forEach(m => m.setMovementMode(this.autoRotationMode ? 'auto' : 'manual'));
       console.log(`[MascotActor] Auto-rotation mode: ${this.autoRotationMode ? 'ON' : 'OFF'}`);
     });
+  }
+
+  /**
+   * Wire mascot event listeners for stat effects and ability notifications
+   */
+  private wireMascotEvents(mascot: MascotActor): void {
+    // Get the sprite to listen for events (events are emitted through the sprite)
+    const sprite = mascot.getSprite();
+
+    // Listen for stat effect events (replaces cannonFired)
+    sprite.on('mascotStatEffect', (data: { phase: string; effect: any; ultimate: boolean; targets: any }) => {
+      this.handleMascotStatEffect(data, mascot);
+    });
+
+    sprite.on('mascotAbilityStart', (data: { phase: string; timestamp: number }) => {
+      console.log(`[Mascot] Ability started: ${data.phase}`);
+    });
+  }
+
+  /**
+   * Handle mascot stat effect event - show targeting and apply ripple
+   */
+  private handleMascotStatEffect(data: any, mascot: MascotActor): void {
+    const section = mascot.getAssignedSection();
+    if (!section) return;
+
+    // Get SectionActor for this section
+    const sectionActors = this.actorRegistry.getByCategory('section');
+    const sectionActor = sectionActors.find((sa: any) => sa.getSection().getId() === section.getId());
+    if (!sectionActor) return;
+
+    // Show targeting indicator (1s preview)
+    this.showMascotTargetingIndicator(sectionActor, data.phase);
+
+    // After 1s delay, apply ripple effects
+    this.time.delayedCall(1000, () => {
+      this.applyMascotRippleEffects(sectionActor, data);
+    });
+  }
+
+  /**
+   * Show targeting indicator for mascot activation
+   */
+  private showMascotTargetingIndicator(sectionActor: any, phase: string): void {
+    // Get fans from section based on phase
+    const fans = sectionActor.getFans();
+
+    // For cluster phase, target disinterested fans (attention < 30, happiness < 40)
+    let targetFans = fans;
+    if (phase === 'cluster') {
+      targetFans = fans.filter((fan: any) => {
+        const stats = fan.getStats?.() || { attention: 50, happiness: 50 };
+        return stats.attention < 30 && stats.happiness < 40;
+      });
+    }
+
+    if (targetFans.length > 0 && this.targetingIndicator) {
+      this.targetingIndicator.showTargetArea(targetFans, 1000);
+    }
+  }
+
+  /**
+   * Apply ripple effects from mascot activation
+   */
+  private applyMascotRippleEffects(sectionActor: any, data: any): void {
+    const fanActors = sectionActor.getFanActors();
+    if (!fanActors || fanActors.length === 0) return;
+
+    // Find disinterested fans for ripple epicenters
+    const disinterestedFans = fanActors.filter((fan: any) => {
+      const stats = fan.getStats();
+      return stats.attention < 30 && stats.happiness < 40;
+    });
+
+    if (disinterestedFans.length === 0) {
+      console.log('[Mascot] No disinterested fans to target');
+      return;
+    }
+
+    // Apply ripple from each disinterested fan (up to 5 epicenters)
+    const epicenters = disinterestedFans.slice(0, 5);
+
+    epicenters.forEach((epicenterFan: any) => {
+      // Calculate ripple effect
+      const ripple = this.rippleEngine.calculateRipple(epicenterFan, sectionActor);
+
+      // Apply ripple to affected fans
+      this.rippleEngine.applyRipple(ripple, sectionActor);
+
+      // Get fan sprite for particle position
+      const fanSprite = sectionActor.getFans().find((s: any) => s.fanActor?.id === epicenterFan.id);
+      if (fanSprite) {
+        // Spawn catch particles at epicenter
+        CatchParticles.create(this, fanSprite.x, fanSprite.y);
+      }
+    });
+
+    console.log(`[Mascot] Applied ripple from ${epicenters.length} epicenters, affected ${disinterestedFans.length} fans`);
   }
 
   /**
