@@ -26,8 +26,13 @@ Deployments to itch.io are automated via GitHub Actions:
 3. **Build and Push**:
    ```bash
    cd apps/stadium-simulator
+   pnpm run deploy:itch
+   ```
+   
+   Or manually:
+   ```bash
    pnpm run build
-   butler push dist YOUR_USERNAME/super-duper-octo-sniffle:html5
+   butler push dist $ITCH_ACCOUNT/$ITCH_PROJECT:html5 --userversion $(git rev-parse --short HEAD)
    ```
 
 ### Environment Variables
