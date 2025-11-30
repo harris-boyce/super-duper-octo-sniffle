@@ -78,7 +78,22 @@ jobs:
 
       - name: Install Butler
         run: |
+          set -e
+          # Download Butler binary and its SHA256SUMS
           curl -L -o butler.zip https://broth.itch.ovh/butler/linux-amd64/LATEST/archive/default
+          curl -L -o SHA256SUMS https://broth.itch.ovh/butler/linux-amd64/LATEST/archive/default.sha256
+          # Extract expected hash from SHA256SUMS
+          EXPECTED_HASH=$(cat SHA256SUMS | awk '{print $1}')
+          # Calculate actual hash
+          ACTUAL_HASH=$(sha256sum butler.zip | awk '{print $1}')
+          # Compare hashes
+          if [ "$EXPECTED_HASH" != "$ACTUAL_HASH" ]; then
+            echo "❌ Butler binary checksum verification failed!"
+            echo "Expected: $EXPECTED_HASH"
+            echo "Actual:   $ACTUAL_HASH"
+            exit 1
+          fi
+          echo "✅ Butler binary checksum verified."
           unzip butler.zip
           chmod +x butler
           ./butler -V
