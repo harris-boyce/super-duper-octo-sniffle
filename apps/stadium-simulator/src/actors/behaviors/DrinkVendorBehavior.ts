@@ -445,11 +445,18 @@ export class DrinkVendorBehavior implements AIActorBehavior {
     
     // Notify AIManager for event emission (speech bubbles, UI updates)
     try {
-      // Extract numeric vendor ID from actor ID (format: "actor:vendor-{number}")
+      // Extract numeric vendor ID from actor ID (expected format: "actor:vendor-{number}")
       const actorId = (this.vendorActor as any).id as string;
-      const vendorId = parseInt(actorId.split('-')[1], 10);
-      if (!isNaN(vendorId)) {
-        this.aiManager.notifyVendorServiceComplete(vendorId);
+      const prefix = 'actor:vendor-';
+      if (actorId.startsWith(prefix)) {
+        const vendorId = parseInt(actorId.substring(prefix.length), 10);
+        if (!isNaN(vendorId)) {
+          this.aiManager.notifyVendorServiceComplete(vendorId);
+        } else {
+          console.warn('[DrinkVendorBehavior] Invalid vendor ID format:', actorId);
+        }
+      } else {
+        console.warn('[DrinkVendorBehavior] Unexpected actor ID format:', actorId);
       }
     } catch (e) {
       console.warn('[DrinkVendorBehavior] Failed to notify service complete:', e);

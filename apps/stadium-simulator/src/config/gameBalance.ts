@@ -289,6 +289,13 @@ export const gameBalance = {
     waveCelebration: {
       yOffset: -67, // vertical offset for overlay above section top
     },
+    speechBubble: {
+      duration: 3000, // ms to display bubble
+      fadeInDuration: 200, // ms for fade in animation
+      fadeOutDuration: 200, // ms for fade out animation
+      maxBubbles: 3, // maximum simultaneous bubbles
+      offsetY: 20, // pixels above target sprite
+    },
   },
 
   /**

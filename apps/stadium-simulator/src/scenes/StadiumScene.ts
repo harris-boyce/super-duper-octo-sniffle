@@ -74,7 +74,7 @@ export class StadiumScene extends Phaser.Scene {
   private vendorTargetingActive: number | null = null; // Vendor ID currently being targeted
   private overlayManager?: OverlayManager;
   private activeSpeechBubbles: SpeechBubble[] = [];
-  private readonly MAX_BUBBLES = 3;
+  private readonly MAX_BUBBLES = gameBalance.ui.speechBubble.maxBubbles;
 
   constructor() {
     super({ key: 'StadiumScene' });
@@ -2206,8 +2206,10 @@ export class StadiumScene extends Phaser.Scene {
    * Generic method to show speech bubble above any sprite
    */
   private showSpeechBubble(target: Phaser.GameObjects.Sprite | Phaser.GameObjects.Container, text: string): void {
+    const config = gameBalance.ui.speechBubble;
+    
     // Enforce maximum bubble limit
-    if (this.activeSpeechBubbles.length >= this.MAX_BUBBLES) {
+    if (this.activeSpeechBubbles.length >= config.maxBubbles) {
       // Remove oldest bubble
       const oldest = this.activeSpeechBubbles.shift();
       oldest?.destroy();
@@ -2216,13 +2218,13 @@ export class StadiumScene extends Phaser.Scene {
     // Create new bubble
     const bubble = new SpeechBubble(this, 0, 0, {
       text,
-      duration: 3000,
-      fadeInDuration: 200,
-      fadeOutDuration: 200,
+      duration: config.duration,
+      fadeInDuration: config.fadeInDuration,
+      fadeOutDuration: config.fadeOutDuration,
     });
     
     // Position above target (works for both Sprite and Container)
-    bubble.positionAboveTarget(target as any, 20);
+    bubble.positionAboveTarget(target as any, config.offsetY);
     
     // Add to scene
     this.add.existing(bubble);
