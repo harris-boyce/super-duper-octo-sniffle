@@ -445,7 +445,12 @@ export class DrinkVendorBehavior implements AIActorBehavior {
     
     // Notify AIManager for event emission (speech bubbles, UI updates)
     try {
-      this.aiManager.notifyVendorServiceComplete((this.vendorActor as any).id);
+      // Extract numeric vendor ID from actor ID (format: "actor:vendor-{number}")
+      const actorId = (this.vendorActor as any).id as string;
+      const vendorId = parseInt(actorId.split('-')[1], 10);
+      if (!isNaN(vendorId)) {
+        this.aiManager.notifyVendorServiceComplete(vendorId);
+      }
     } catch (e) {
       console.warn('[DrinkVendorBehavior] Failed to notify service complete:', e);
     }
