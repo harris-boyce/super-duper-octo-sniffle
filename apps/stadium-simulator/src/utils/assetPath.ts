@@ -5,7 +5,7 @@
  * This ensures assets load correctly across all deployment targets:
  * - Vercel: base = '/'
  * - GitHub Pages: base = '/stadium-simulator/'
- * - itch.io: base = '/'
+ * - itch.io: base = './'
  */
 
 /**
@@ -20,6 +20,9 @@
  *
  * // On GitHub Pages (base = '/stadium-simulator/')
  * getAssetPath('assets/file.json') // => '/stadium-simulator/assets/file.json'
+ *
+ * // On itch.io (base = './')
+ * getAssetPath('assets/file.json') // => './assets/file.json'
  */
 export function getAssetPath(path: string): string {
   const baseUrl = import.meta.env.BASE_URL;

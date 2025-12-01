@@ -6,14 +6,12 @@ export default defineConfig(() => {
   const isVercel = Boolean(process.env.VERCEL);
 
   // Determine base path based on deployment target
-  let base = '/stadium-simulator/'; // Default for GitHub Pages
+  let base = '/stadium-simulator/'; // Default for GitHub Pages (also used if deployTarget === 'github')
 
   if (deployTarget === 'itch') {
     base = './'; // Relative paths for itch.io CDN
   } else if (deployTarget === 'vercel') {
     base = '/';
-  } else if (deployTarget === 'github') {
-    base = '/stadium-simulator/';
   } else if (isVercel) {
     base = '/'; // Backward compatibility: auto-detect Vercel
   }
