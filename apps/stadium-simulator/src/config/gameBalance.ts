@@ -19,7 +19,7 @@ export const gameBalance = {
     thirstActivationAmount: 3, // Reduced from 5 - smaller jumps
     thirstThreshold: 50, // When Phase 2 decay kicks in
     thirstDecayRate: 2, // Linear growth after threshold
-    thirstReductionOnServe: 30, // Thirst reduction when vendor serves drink
+    thirstReductionOnServe: 30, // Partial thirst reduction (not full reset) to create strategic timing gameplay
     
     // === Happiness System (Recovery Added) ===
     unhappyHappinessThreshold: 30, // When happiness drops below this, fan becomes unhappy
