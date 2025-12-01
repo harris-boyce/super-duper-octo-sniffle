@@ -9,6 +9,7 @@ import { MascotActor } from '@/actors/MascotActor';
 import { VendorState } from '@/managers/interfaces';
 import { AnnouncerService } from '@/managers/AnnouncerService';
 import { DevPanel } from '@/ui/DevPanel';
+import { SpeechBubble } from '@/ui/SpeechBubble';
 
 import { gameBalance } from '@/config/gameBalance';
 import { ActorRegistry } from '@/actors/base/ActorRegistry';
@@ -72,6 +73,8 @@ export class StadiumScene extends Phaser.Scene {
   private targetingReticle?: TargetingReticle;
   private vendorTargetingActive: number | null = null; // Vendor ID currently being targeted
   private overlayManager?: OverlayManager;
+  private activeSpeechBubbles: SpeechBubble[] = [];
+
 
   constructor() {
     super({ key: 'StadiumScene' });
@@ -1408,6 +1411,10 @@ export class StadiumScene extends Phaser.Scene {
     // Clean up on scene shutdown
     this.events.on('shutdown', () => {
       debugPanel.remove();
+      
+      // Clean up speech bubbles
+      this.activeSpeechBubbles.forEach(b => b.destroy());
+      this.activeSpeechBubbles = [];
     });
   }
 
@@ -1504,6 +1511,9 @@ export class StadiumScene extends Phaser.Scene {
         sprite.setMovementState('cooldown');
       }
       console.log(`[Vendor] Vendor ${data.vendorId} completed service`);
+      
+      // Show speech bubble on service completion
+      this.showVendorDialogue(data.vendorId);
     });
 
     this.aiManager.on('vendorDistracted', (data: { vendorId: number }) => {
@@ -1598,6 +1608,12 @@ export class StadiumScene extends Phaser.Scene {
 
     sprite.on('mascotAbilityStart', (data: { phase: string; timestamp: number }) => {
       console.log(`[Mascot] Ability started: ${data.phase}`);
+    });
+
+    // Listen for activated event (speech bubbles)
+    sprite.on('activated', (data: { section: string }) => {
+      console.log(`[Mascot] Activated in section ${data.section}`);
+      this.showMascotDialogue(mascot);
     });
   }
 
@@ -2130,6 +2146,99 @@ export class StadiumScene extends Phaser.Scene {
     graphics.fillRect(0, 0, 4, 4);
     graphics.generateTexture('particle', 4, 4);
     graphics.destroy();
+  }
+
+  /**
+   * Show speech bubble for vendor service
+   */
+  private showVendorDialogue(vendorId: number): void {
+    const vendorSprite = this.vendorSprites.get(vendorId);
+    if (!vendorSprite) return;
+
+    // Get dialogue from personality system
+    const dialogue = vendorSprite.triggerDialogue('vendorServe', {
+      score: this.waveManager.getScore(),
+      waveState: this.waveManager.isActive() ? 'active' : 'inactive',
+    });
+    
+    // Fallback if no personality
+    const vendorFallbacks = [
+      'Hot dogs!',
+      'Get your snacks here!',
+      'Ice cold drinks!',
+      'Popcorn!',
+      'Who ordered the nachos?',
+    ];
+    const text = dialogue || vendorFallbacks[Math.floor(Math.random() * vendorFallbacks.length)];
+    
+    // Create and show bubble (Vendor is a Container, cast for typing)
+    this.showSpeechBubble(vendorSprite, text);
+  }
+
+  /**
+   * Show speech bubble for mascot activation
+   */
+  private showMascotDialogue(mascotActor: MascotActor): void {
+    const sprite = mascotActor.getSprite();
+    
+    // Get personality if available - use dialogue lines as fallback to catchphrase
+    const personality = mascotActor.getPersonality();
+    const mascotFallbacks = [
+      "Let's get HYPED!",
+      'WAVE TIME!',
+      'GO TEAM GO!',
+      'Make some NOISE!',
+      'YEAH!!!',
+    ];
+    
+    // Try to get a dialogue line from personality first
+    let text = mascotFallbacks[Math.floor(Math.random() * mascotFallbacks.length)];
+    if (personality && personality.dialogue && personality.dialogue.length > 0) {
+      const randomDialogue = personality.dialogue[Math.floor(Math.random() * personality.dialogue.length)];
+      text = randomDialogue.text;
+    }
+    
+    // Create and show bubble
+    this.showSpeechBubble(sprite, text);
+  }
+
+  /**
+   * Generic method to show speech bubble above any sprite
+   */
+  private showSpeechBubble(target: Phaser.GameObjects.Sprite | Phaser.GameObjects.Container, text: string): void {
+    const config = gameBalance.ui.speechBubble;
+    
+    // Enforce maximum bubble limit
+    if (this.activeSpeechBubbles.length >= config.maxBubbles) {
+      // Remove oldest bubble
+      const oldest = this.activeSpeechBubbles.shift();
+      oldest?.destroy();
+    }
+    
+    // Create new bubble
+    const bubble = new SpeechBubble(this, 0, 0, {
+      text,
+      duration: config.duration,
+      fadeInDuration: config.fadeInDuration,
+      fadeOutDuration: config.fadeOutDuration,
+    });
+    
+    // Position above target (works for both Sprite and Container)
+    bubble.positionAboveTarget(target, config.offsetY);
+    
+    // Add to scene
+    this.add.existing(bubble);
+    
+    // Track active bubble
+    this.activeSpeechBubbles.push(bubble);
+    
+    // Remove from tracking when destroyed
+    bubble.once('destroy', () => {
+      const index = this.activeSpeechBubbles.indexOf(bubble);
+      if (index > -1) {
+        this.activeSpeechBubbles.splice(index, 1);
+      }
+    });
   }
 }
 

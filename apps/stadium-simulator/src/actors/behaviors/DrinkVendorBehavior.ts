@@ -441,9 +441,25 @@ export class DrinkVendorBehavior implements AIActorBehavior {
       this.targetFanActor.setHappiness(Math.min(100, currentHappiness + 15));
       
       console.log('[DrinkVendorBehavior] Service complete - happiness boost applied');
-      
-      // Emit event for UI feedback (celebration animation, sound)
-      // this.vendorActor.emit('serviceComplete', { fanPosition: this.targetFanActor.getPosition() });
+    }
+    
+    // Notify AIManager for event emission (speech bubbles, UI updates)
+    try {
+      // Extract numeric vendor ID from actor ID (expected format: "actor:vendor-{number}")
+      const actorId = (this.vendorActor as any).id as string;
+      const prefix = 'actor:vendor-';
+      if (actorId.startsWith(prefix)) {
+        const vendorId = parseInt(actorId.substring(prefix.length), 10);
+        if (!isNaN(vendorId)) {
+          this.aiManager.notifyVendorServiceComplete(vendorId);
+        } else {
+          console.warn('[DrinkVendorBehavior] Invalid vendor ID format:', actorId);
+        }
+      } else {
+        console.warn('[DrinkVendorBehavior] Unexpected actor ID format:', actorId);
+      }
+    } catch (e) {
+      console.warn('[DrinkVendorBehavior] Failed to notify service complete:', e);
     }
     
     // Clear target and return to idle

@@ -98,6 +98,9 @@ export class MascotActor extends AnimatedActor {
     // Visual context
     this.sprite.setVisible(true);
     this.sprite.setContextVisual('hyping');
+    
+    // Emit activated event for speech bubbles and other effects
+    this.emit('activated', { section: section.getId() });
   }
 
   /** Deactivate current activation (called internally when duration expires) */

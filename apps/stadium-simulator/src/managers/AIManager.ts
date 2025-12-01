@@ -557,6 +557,14 @@ export class AIManager {
   }
 
   /**
+   * Public helper to notify listeners that a vendor has completed service.
+   * Enables speech bubble and other service completion effects.
+   */
+  public notifyVendorServiceComplete(vendorId: number): void {
+    this.emit('serviceComplete', { vendorId });
+  }
+
+  /**
    * Force recall of a vendor (abort current assignment/service and start patrol)
    */
   public recallVendor(vendorId: number): void {
