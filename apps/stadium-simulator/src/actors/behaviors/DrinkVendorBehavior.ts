@@ -90,7 +90,7 @@ export class DrinkVendorBehavior implements AIActorBehavior {
     // Defensive check: Cannot assign without pathfinding service
     if (!this.pathfindingService) {
       console.error('[DrinkVendorBehavior] Cannot assign to section - PathfindingService is not available!');
-      this.state = 'awaitingAssignment';
+      this.state = 'awaitingAssignment' as AIActorState;
       return;
     }
 
@@ -165,17 +165,17 @@ export class DrinkVendorBehavior implements AIActorBehavior {
           console.warn('[EndCell]', { passable: c?.passable, zone: c?.zoneType, walls: c?.walls, out: c?.allowedOutgoing, inc: c?.allowedIncoming });
         }
 
-        // Emit event for UI feedback
-        this.aiManager.emit('vendorAssignmentFailed', {
-          vendorId: this.vendorActor.getActorId(),
-          reason: 'No path found',
-          targetRow: desiredRow,
-          targetCol: desiredCol,
-          sectionIdx
-        });
+        // TODO: Emit event for UI feedback when AIManager has public event method
+        // this.aiManager.emit('vendorAssignmentFailed', {
+        //   vendorId: (this.vendorActor as any).id,
+        //   reason: 'No path found',
+        //   targetRow: desiredRow,
+        //   targetCol: desiredCol,
+        //   sectionIdx
+        // });
 
         // Reset to awaiting assignment so user can retry
-        this.state = 'awaitingAssignment';
+        this.state = 'awaitingAssignment' as AIActorState;
         this.assignedSectionIdx = null;
       }
     } else {
