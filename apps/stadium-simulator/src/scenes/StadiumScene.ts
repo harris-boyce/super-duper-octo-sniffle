@@ -74,7 +74,7 @@ export class StadiumScene extends Phaser.Scene {
   private vendorTargetingActive: number | null = null; // Vendor ID currently being targeted
   private overlayManager?: OverlayManager;
   private activeSpeechBubbles: SpeechBubble[] = [];
-  private readonly MAX_BUBBLES = gameBalance.ui.speechBubble.maxBubbles;
+
 
   constructor() {
     super({ key: 'StadiumScene' });
@@ -2172,7 +2172,7 @@ export class StadiumScene extends Phaser.Scene {
     const text = dialogue || vendorFallbacks[Math.floor(Math.random() * vendorFallbacks.length)];
     
     // Create and show bubble (Vendor is a Container, cast for typing)
-    this.showSpeechBubble(vendorSprite as any, text);
+    this.showSpeechBubble(vendorSprite, text);
   }
 
   /**
@@ -2224,7 +2224,7 @@ export class StadiumScene extends Phaser.Scene {
     });
     
     // Position above target (works for both Sprite and Container)
-    bubble.positionAboveTarget(target as any, config.offsetY);
+    bubble.positionAboveTarget(target, config.offsetY);
     
     // Add to scene
     this.add.existing(bubble);
