@@ -75,6 +75,7 @@ jobs:
         run: pnpm run build
         env:
           NODE_ENV: production
+          VITE_DEPLOY_TARGET: itch
 
       - name: Verify build output
         run: |
