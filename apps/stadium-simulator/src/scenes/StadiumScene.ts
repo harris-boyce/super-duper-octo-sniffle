@@ -1992,7 +1992,7 @@ export class StadiumScene extends Phaser.Scene {
    * @param message Error message to display
    */
   private showAssignmentError(message: string): void {
-    console.warn(`[Assignment Error] ${message}`);
+    console.warn(`[StadiumScene] Assignment Error: ${message}`);
     // TODO: Add visual feedback (red flash on reticle, temporary error text)
     // For now, just log to console - UI feedback can be added later
   }
