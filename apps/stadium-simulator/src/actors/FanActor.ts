@@ -229,8 +229,8 @@ export class FanActor extends AnimatedActor {
    * @param sceneOrTimestamp Scene reference or current timestamp in milliseconds
    */
   public drinkServed(sceneOrTimestamp: Phaser.Scene | number): void {
-    // Reduce thirst significantly
-    this.thirst = Math.max(0, this.thirst - 30);
+    // Reduce thirst using config value
+    this.thirst = Math.max(0, this.thirst - gameBalance.fanStats.thirstReductionOnServe);
     
     // NEW: Recover happiness on vendor serve
     this.happiness = Math.min(
@@ -252,10 +252,10 @@ export class FanActor extends AnimatedActor {
    */
   public onWaveParticipation(scene: Phaser.Scene, success: boolean): void {
     if (success) {
-      // Max out attention
+      // NEW: Recover attention on wave success
       this.attention = Math.min(
         gameBalance.fanStats.attentionMaximum || 100,
-        100
+        this.attention + gameBalance.fanStats.attentionRecoveryOnWaveSuccess
       );
       
       // NEW: Recover happiness on wave success

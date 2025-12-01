@@ -692,8 +692,8 @@ export class WaveManager {
         
         // Add consecutive bonus (capped)
         const consecutiveBonus = Math.min(
-          cfg.consecutiveSuccessCap || 30,
-          this.consecutiveSuccesses * (cfg.consecutiveSuccessBonus || 5)
+          cfg.consecutiveSuccessCap,
+          this.consecutiveSuccesses * cfg.consecutiveSuccessBonus
         );
         
         this.currentWaveStrength = Math.min(100, this.currentWaveStrength + (bonus + consecutiveBonus) * momentumBoost);
