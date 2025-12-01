@@ -441,9 +441,13 @@ export class DrinkVendorBehavior implements AIActorBehavior {
       this.targetFanActor.setHappiness(Math.min(100, currentHappiness + 15));
       
       console.log('[DrinkVendorBehavior] Service complete - happiness boost applied');
-      
-      // Emit event for UI feedback (celebration animation, sound)
-      // this.vendorActor.emit('serviceComplete', { fanPosition: this.targetFanActor.getPosition() });
+    }
+    
+    // Notify AIManager for event emission (speech bubbles, UI updates)
+    try {
+      this.aiManager.notifyVendorServiceComplete((this.vendorActor as any).id);
+    } catch (e) {
+      console.warn('[DrinkVendorBehavior] Failed to notify service complete:', e);
     }
     
     // Clear target and return to idle
