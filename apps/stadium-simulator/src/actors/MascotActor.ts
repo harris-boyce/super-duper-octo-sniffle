@@ -163,10 +163,14 @@ export class MascotActor extends AnimatedActor {
     }
   }
 
-  /** Update per frame: delegate to behavior tick */
-  public update(delta: number): void {
+  /** 
+   * Update per frame: delegate to behavior tick 
+   * @param delta - Time elapsed in milliseconds
+   * @param roundTime - Time relative to round start (negative = remaining, positive = elapsed)
+   */
+  public update(delta: number, roundTime: number): void {
     // Tick behavior (internal cadence-based logic)
-    this.behavior.tick(delta);
+    this.behavior.tick(delta, roundTime);
     const deltaMs = delta;
     // Cooldown decrement
     if (this.cooldownRemainingMs > 0) {

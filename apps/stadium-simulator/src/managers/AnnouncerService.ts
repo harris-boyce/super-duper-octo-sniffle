@@ -21,7 +21,7 @@ export class AnnouncerService {
       );
       return response.data.commentary;
     } catch (error) {
-      console.error('Failed to fetch announcer commentary:', error);
+      // console.error('Failed to fetch announcer commentary:', error);
       return 'The crowd goes wild!';
     }
   }

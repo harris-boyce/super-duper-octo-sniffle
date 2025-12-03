@@ -21,6 +21,7 @@ export type FanState = 'happy' | 'engaged' | 'disengaged' | 'waving' | 'thirsty'
 export class FanActor extends AnimatedActor {
   private fan: Fan;
   private gridManager?: import('@/managers/GridManager').GridManager;
+  private actorRegistry?: any; // For vendor collision checks
 
   // Fan-level stats (game logic)
   private happiness: number;
@@ -48,11 +49,13 @@ export class FanActor extends AnimatedActor {
     initialStats?: { happiness: number; thirst: number; attention: number },
     category: ActorCategory = 'fan',
     enableLogging = false,
-    gridManager?: import('@/managers/GridManager').GridManager
+    gridManager?: import('@/managers/GridManager').GridManager,
+    actorRegistry?: any
   ) {
     super(id, 'fan', category, 0, 0, enableLogging);
     this.fan = fan;
     this.gridManager = gridManager;
+    this.actorRegistry = actorRegistry;
 
     // Initialize stats
     if (initialStats) {
@@ -267,12 +270,116 @@ export class FanActor extends AnimatedActor {
 
   /**
    * Roll to see if this fan participates in the wave
+   * Checks for vendor collision at fan's position during participation check
+   * NOTE: Collision is checked and emitted REGARDLESS of participation outcome
    */
   public rollForWaveParticipation(sectionBonus: number): boolean {
-    const chance = this.calculateWaveChance(sectionBonus);
+    // ALWAYS check for vendor collision (even if fan doesn't participate)
+    const vendorAtPosition = this.checkVendorCollision();
+    
+    // Emit collision event immediately if vendor present (before participation roll)
+    // This ensures collision is detected even if fan doesn't participate
+    if (vendorAtPosition) {
+      this.emitVendorCollision(vendorAtPosition);
+    }
+    
+    // Calculate base chance
+    let chance = this.calculateWaveChance(sectionBonus);
+    
+    // Vendor presence reduces participation chance (distraction/obstacle)
+    if (vendorAtPosition) {
+      const vendorPenalty = gameBalance.vendorMovement.waveCollisionPenalty;
+      chance += vendorPenalty;
+      chance = Math.max(0, Math.min(100, chance));
+    }
+    
     const result = Math.random() * 100 < chance;
     this.lastWaveParticipated = result;
+    
     return result;
+  }
+
+  // === Vendor Collision Detection ===
+
+  /**
+   * Check if a vendor is currently at this fan's grid position
+   * Uses horizontal bounding box overlap to detect vendors that span multiple columns
+   * Ignores vertical overlap - only checks if vendor is in the same row and overlaps horizontally
+   * @returns The vendor actor if present, null otherwise
+   */
+  private checkVendorCollision(): any | null {
+    if (!this.actorRegistry || !this.gridManager) return null;
+    
+    const fanPos = this.getGridPosition();
+    
+    // Only check seat rows (16-19) to avoid false positives in aisles
+    if (fanPos.row < 16 || fanPos.row > 19) return null;
+    
+    // Get fan's world position and cell bounds
+    const fanWorldPos = this.gridManager.gridToWorld(fanPos.row, fanPos.col);
+    const cellWidth = this.gridManager.cellWidth ?? 40;
+    
+    // Fan cell horizontal bounds (centered)
+    const fanLeft = fanWorldPos.x - cellWidth / 2;
+    const fanRight = fanWorldPos.x + cellWidth / 2;
+    
+    // Get all vendors from registry
+    const vendors = this.actorRegistry.getByCategory('vendor');
+    
+    for (const vendor of vendors) {
+      const vendorAny = vendor as any;
+      const vendorWorldPos = vendorAny.getPosition?.();
+      
+      if (!vendorWorldPos) continue;
+      
+      // Check if vendor is in same row (using grid position for row check)
+      const vendorGridPos = this.gridManager.worldToGrid(vendorWorldPos.x, vendorWorldPos.y);
+      if (!vendorGridPos || vendorGridPos.row !== fanPos.row) continue;
+      
+      // Vendor sprite dimensions (approximate - vendors are ~32x48 pixels)
+      const vendorWidth = 32;
+      
+      // Vendor horizontal bounding box
+      const vendorLeft = vendorWorldPos.x - vendorWidth / 2;
+      const vendorRight = vendorWorldPos.x + vendorWidth / 2;
+      
+      // Check for horizontal overlap only
+      const overlapsHorizontally = 
+        vendorLeft < fanRight &&
+        vendorRight > fanLeft;
+      
+      if (overlapsHorizontally) {
+        return vendor;
+      }
+    }
+    
+    return null;
+  }
+
+  /**
+   * Emit vendor collision event when fan participates in wave with vendor present
+   * @param vendor The vendor actor at collision
+   */
+  private emitVendorCollision(vendor: any): void {
+    const vendorAny = vendor as any;
+    const behavior = vendorAny.getBehavior?.();
+    const pointsAtRisk = behavior?.getPointsEarned?.() ?? 0;
+    const fanPos = this.getGridPosition();
+    
+    // Find seat actor at this position for complete event data
+    const seats = this.actorRegistry?.getByCategory('seat') ?? [];
+    const seatAtPosition = seats.find((seat: any) => {
+      const seatPos = seat.getGridPosition();
+      return seatPos.row === fanPos.row && seatPos.col === fanPos.col;
+    });
+    
+    // Emit collision event to WaveManager for scoring/UI
+    // Note: This requires FanActor to have event emission capability
+    // For now, log it - we'll wire up event emission in next step
+    console.log(
+      `[FanActor] 💥 WAVE COLLISION! Fan ${this.id} + Vendor ${vendor.id} at (${fanPos.row},${fanPos.col}) | ` +
+      `${pointsAtRisk} pts at risk | Seat: ${seatAtPosition?.id ?? 'unknown'}`
+    );
   }
 
   // === Grump/Difficult Terrain Methods ===
@@ -408,10 +515,11 @@ export class FanActor extends AnimatedActor {
    * Update fan actor (called each frame)
    * Handles stat decay, derives state from stats, and triggers transitions
    * @param delta - Time elapsed in milliseconds
+   * @param roundTime - Time relative to round start (negative = remaining, positive = elapsed)
    * @param scene - Phaser scene (for time.now access)
    * @param environmentalModifier - Environmental thirst multiplier (optional, defaults to 1.0)
    */
-  public update(delta: number, scene?: Phaser.Scene, environmentalModifier: number = 1.0): void {
+  public update(delta: number, roundTime: number, scene?: Phaser.Scene, environmentalModifier: number = 1.0): void {
     // Update stats (thirst/happiness/attention decay)
     if (scene) {
       this.updateStats(delta, scene, environmentalModifier);

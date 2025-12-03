@@ -118,7 +118,7 @@ export class TargetingReticle extends Phaser.GameObjects.Container {
     const gridManager = sceneAny.gridManager;
     
     if (!actorRegistry || !gridManager) {
-      console.warn('[TargetingReticle] actorRegistry or gridManager unavailable; using legacy hardcoded highlight');
+      // console.warn('[TargetingReticle] actorRegistry or gridManager unavailable; using legacy hardcoded highlight');
       const legacyWidth = 256;
       const legacyHeight = 128;
       const legacyOffsetX = 128;
@@ -135,14 +135,14 @@ export class TargetingReticle extends Phaser.GameObjects.Container {
     // Query SectionActors from registry
     const sectionActors = actorRegistry.getByCategory('section');
     if (!sectionActors || sectionActors.length <= sectionIdx) {
-      console.warn(`[TargetingReticle] Section ${sectionIdx} not found in registry`);
+      // console.warn(`[TargetingReticle] Section ${sectionIdx} not found in registry`);
       return;
     }
 
     const sectionActor = sectionActors[sectionIdx];
     const sectionData = sectionActor.getSectionData();
     if (!sectionData) {
-      console.warn(`[TargetingReticle] Section ${sectionIdx} has no data`);
+      // console.warn(`[TargetingReticle] Section ${sectionIdx} has no data`);
       return;
     }
 

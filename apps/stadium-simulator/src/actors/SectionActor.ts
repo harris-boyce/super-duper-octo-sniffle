@@ -152,7 +152,7 @@ export class SectionActor extends SceneryActor {
           const seatOffsetY = -10; // Offset to align with top of row floor divider (matches SectionRow seat positioning)
           const fanY = worldPos.y - seatOffsetY; // Adjust from cell center by seat offset
           const fan = new Fan(this.section.scene, worldPos.x, fanY);
-          // Create FanActor for game logic
+          // Create FanActor for game logic (pass actorRegistry for vendor collision detection)
           const fanActor = new FanActor(
             `fan-${this.sectionId}-${fd.row}-${fd.col}`,
             fan,
@@ -162,7 +162,9 @@ export class SectionActor extends SceneryActor {
               attention: fd.initialStats.attention
             } : undefined,
             'fan',
-            false
+            false,
+            this.gridManager,
+            this.actorRegistry
           );
           // Set the FanActor's grid position to absolute grid coordinates
           fanActor.setGridPosition(fd.gridRow, fd.gridCol, this.gridManager);
@@ -331,14 +333,15 @@ private lastLoggedTargetFan: number = 0;
    * Per-frame update: drive fan stat decay and aggregate cache.
    * Environmental modifier passed in from AIManager orchestrator.
    * @param delta - Time elapsed in milliseconds
+   * @param roundTime - Time relative to round start (negative = remaining, positive = elapsed)
    * @param scene - Phaser scene for FanActor updates
    * @param environmentalModifier - Environmental thirst multiplier
    */
-  public update(delta: number, scene?: Phaser.Scene, environmentalModifier: number = 1.0): void {
+  public update(delta: number, roundTime: number, scene?: Phaser.Scene, environmentalModifier: number = 1.0): void {
     // Update all fan actors (stat decay + state transitions)
     const allFanActors = this.getFanActors();
     for (const fanActor of allFanActors) {
-      fanActor.update(delta, scene, environmentalModifier);
+      fanActor.update(delta, roundTime, scene, environmentalModifier);
     }
     
     // Update cached aggregate values for performance
@@ -569,7 +572,7 @@ private lastLoggedTargetFan: number = 0;
 
     // Start all fans in this column (don't await - allows smooth overlapping animations)
     Promise.all(columnPromises).catch(err => {
-      console.error('Error during column animation:', err);
+      // console.error('Error during column animation:', err);
     });
   }
 }

@@ -202,8 +202,12 @@ export class MascotBehavior implements AIActorBehavior {
     }
   }
 
-  /** Behavior tick called each frame */
-  public tick(deltaTime: number): void {
+  /** 
+   * Behavior tick called each frame 
+   * @param deltaTime - Time elapsed in milliseconds
+   * @param roundTime - Time relative to round start (negative = remaining, positive = elapsed)
+   */
+  public tick(deltaTime: number, roundTime: number): void {
     const now = performance.now();
     this.tickAccumulator += deltaTime;
 

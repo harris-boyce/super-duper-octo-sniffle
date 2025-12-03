@@ -211,11 +211,11 @@ export class WaveSprite extends UtilityActor {
     const dx = this.targetX - this.x;
     const distance = Math.abs(dx);
 
-    console.log(`[WaveSprite.update] x=${this.x.toFixed(1)} target=${this.targetX} dx=${dx.toFixed(1)} distance=${distance.toFixed(1)} moveDistance=${moveDistance.toFixed(1)} direction=${this.direction}`);
+    // console.log(`[WaveSprite.update] x=${this.x.toFixed(1)} target=${this.targetX} dx=${dx.toFixed(1)} distance=${distance.toFixed(1)} moveDistance=${moveDistance.toFixed(1)} direction=${this.direction}`);
 
     if (distance <= moveDistance) {
       // Reached target
-      console.log(`[WaveSprite.update] REACHED TARGET - completing`);
+      // console.log(`[WaveSprite.update] REACHED TARGET - completing`);
       this.x = this.targetX;
       this.onMovementComplete();
     } else {

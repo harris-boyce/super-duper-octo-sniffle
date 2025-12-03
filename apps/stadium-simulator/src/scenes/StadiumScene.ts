@@ -84,28 +84,28 @@ export class StadiumScene extends Phaser.Scene {
     this.gridManager = data?.gridManager;
 
     if (this.debugMode) {
-      console.log('StadiumScene initialized in run mode');
-      console.log('GridManager received:', this.gridManager ? 'YES' : 'NO');
+      if (gameBalance.debug.sceneLogs) console.log('StadiumScene initialized in run mode');
+      if (gameBalance.debug.sceneLogs) console.log('GridManager received:', this.gridManager ? 'YES' : 'NO');
     }
   }
 
   async create(): Promise<void> {
 
     // Initialize personality integration manager (loads AI content)
-    console.log('[StadiumScene] Initializing PersonalityIntegrationManager...');
+    if (gameBalance.debug.sceneLogs) console.log('[StadiumScene] Initializing PersonalityIntegrationManager...');
     const personalityManager = PersonalityIntegrationManager();
     await personalityManager.initialize();
-    console.log('[StadiumScene] PersonalityIntegrationManager initialized');
+    if (gameBalance.debug.sceneLogs) console.log('[StadiumScene] PersonalityIntegrationManager initialized');
 
     // Load level data (sections, seats, fans, vendors)
     const levelData = await LevelService.loadLevel();
     this.levelData = levelData; // Cache for later use
-    console.log('[StadiumScene] Level data loaded:', levelData);
+    if (gameBalance.debug.sceneLogs) console.log('[StadiumScene] Level data loaded:', levelData);
 
     // Load zone configuration into GridManager
     if (this.gridManager && levelData.gridConfig) {
-      console.log('[StadiumScene] Loading zone config into GridManager');
-      console.log('[StadiumScene] gridConfig structure:', {
+      if (gameBalance.debug.sceneLogs) console.log('[StadiumScene] Loading zone config into GridManager');
+      if (gameBalance.debug.sceneLogs) console.log('[StadiumScene] gridConfig structure:', {
         hasCellRanges: !!levelData.gridConfig.cellRanges,
         cellRangesCount: levelData.gridConfig.cellRanges?.length,
         hasCells: !!levelData.gridConfig.cells,
@@ -113,9 +113,9 @@ export class StadiumScene extends Phaser.Scene {
         hasGridConfig: !!levelData.gridConfig.gridConfig,
       });
       this.gridManager.loadZoneConfig(levelData.gridConfig);
-      console.log('[StadiumScene] Zone config loaded successfully');
+      if (gameBalance.debug.sceneLogs) console.log('[StadiumScene] Zone config loaded successfully');
     } else {
-      console.warn('[StadiumScene] GridManager or gridConfig not available');
+      // console.warn('[StadiumScene] GridManager or gridConfig not available');
     }
 
     // Attach actorRegistry to the scene instance for WaveManager access
@@ -169,7 +169,7 @@ export class StadiumScene extends Phaser.Scene {
       this.pathfindingService = new PathfindingService(this.gridManager);
       this.aiManager.attachPathfindingService(this.pathfindingService);
     } else {
-      console.warn('[StadiumScene] Cannot initialize PathfindingService without GridManager');
+      // console.warn('[StadiumScene] Cannot initialize PathfindingService without GridManager');
     }
 
     // Create SectionActors from level data (Actor-first, data-driven!)
@@ -235,7 +235,7 @@ export class StadiumScene extends Phaser.Scene {
     // Create drop zone actors from grid configuration
     if (this.gridManager) {
       const dropZones = this.gridManager.getDropZones();
-      console.log(`[StadiumScene] Creating ${dropZones.length} drop zone actors`);
+      if (gameBalance.debug.sceneLogs) console.log(`[StadiumScene] Creating ${dropZones.length} drop zone actors`);
       
       dropZones.forEach((dropZone, idx) => {
         const actorId = ActorFactory.generateId('dropzone', idx);
@@ -255,7 +255,7 @@ export class StadiumScene extends Phaser.Scene {
         this.actorRegistry.register(dropZoneActor);
         this.dropZoneActors.push(dropZoneActor);
         
-        console.log(`[StadiumScene] Created drop zone at grid (${dropZone.row},${dropZone.col})`);
+        if (gameBalance.debug.sceneLogs) console.log(`[StadiumScene] Created drop zone at grid (${dropZone.row},${dropZone.col})`);
       });
     }
 
@@ -270,7 +270,7 @@ export class StadiumScene extends Phaser.Scene {
     if (levelData.vendors && this.gridManager) {
       levelData.vendors.forEach((vendorData, idx) => {
         const worldPos = this.gridManager!.gridToWorld(vendorData.gridRow, vendorData.gridCol);
-        console.log(`[Vendor Init] Spawning vendor at grid (${vendorData.gridRow}, ${vendorData.gridCol}) -> world (${worldPos.x}, ${worldPos.y})`);
+        if (gameBalance.debug.sceneLogs) console.log(`[Vendor Init] Spawning vendor at grid (${vendorData.gridRow}, ${vendorData.gridCol}) -> world (${worldPos.x}, ${worldPos.y})`);
 
         // Spawn vendor actor (actor creates its own sprite)
         const { actor: vendorActor, id: vendorId } = this.aiManager.spawnVendor(this, worldPos.x, worldPos.y, vendorData.type as any, 'good');
@@ -278,7 +278,7 @@ export class StadiumScene extends Phaser.Scene {
         // Store sprite for UI controls
         const vendorSprite = vendorActor.getVendor();
         this.vendorSprites.set(vendorId, vendorSprite);
-        console.log(`[Vendor Init] Created vendor actor ${vendorId}, total sprites: ${this.vendorSprites.size}`);
+        if (gameBalance.debug.sceneLogs) console.log(`[Vendor Init] Created vendor actor ${vendorId}, total sprites: ${this.vendorSprites.size}`);
       });
       
       // Rebuild vendor controls to show buttons immediately
@@ -306,7 +306,7 @@ export class StadiumScene extends Phaser.Scene {
         return { x, y };
       });
     this.announcer.getCommentary(JSON.stringify({ event: 'waveStart' }))
-      .then(result => console.log('[AnnouncerService test] result:', result))
+      // .then(result => console.log('[AnnouncerService test] result:', result))
       .catch(err => console.error('[AnnouncerService test] error', err));
 
     // Title at top center
@@ -345,7 +345,7 @@ export class StadiumScene extends Phaser.Scene {
     // Initialize targeting indicator for mascot visual feedback
     // Note: Requires 'particle' texture created by MenuScene.preload()
     if (!this.textures.exists('particle')) {
-      console.warn('[StadiumScene] Particle texture not found, creating fallback');
+      // console.warn('[StadiumScene] Particle texture not found, creating fallback');
       this.createParticleTexture();
     }
     this.targetingIndicator = new TargetingIndicator(this);
@@ -371,7 +371,7 @@ export class StadiumScene extends Phaser.Scene {
           if (this.gridOverlay) {
             const newVisibility = !this.gridOverlay.visible;
             this.gridOverlay.setDebugVisible(newVisibility);
-            console.log(`[StadiumScene] Grid overlay: ${newVisibility ? 'ON' : 'OFF'}`);
+            // console.log(`[StadiumScene] Grid overlay: ${newVisibility ? 'ON' : 'OFF'}`);
           }
         });
 
@@ -426,7 +426,7 @@ export class StadiumScene extends Phaser.Scene {
       this.actorRegistry.register(mascotActor);
       this.aiManager.registerMascot(mascotActor);
       this.mascotActors.push(mascotActor);
-      console.log(`[MascotActor] Registered mascot actor ${actorId} for section ${section.getId()}`);
+      // console.log(`[MascotActor] Registered mascot actor ${actorId} for section ${section.getId()}`);
     });
 
     // Setup mascot keyboard controls
@@ -440,11 +440,11 @@ export class StadiumScene extends Phaser.Scene {
 
     // Notify WorldScene that initialization is complete
     this.events.emit('stadiumReady', { aiManager: this.aiManager });
-    console.log('[StadiumScene] Initialization complete, emitted stadiumReady event');
+    // console.log('[StadiumScene] Initialization complete, emitted stadiumReady event');
 
     // Notify WorldScene that initialization is complete
     this.events.emit('stadiumReady', { aiManager: this.aiManager });
-    console.log('[StadiumScene] Initialization complete, emitted stadiumReady event');
+    // console.log('[StadiumScene] Initialization complete, emitted stadiumReady event');
 
     // Section labels are now fully handled by SectionActor; no logic here
 
@@ -521,7 +521,7 @@ export class StadiumScene extends Phaser.Scene {
           waveBtn.disabled = true;
           waveBtn.textContent = 'WAVE IN PROGRESS...';
         }
-        console.log(`[DEBUG] Force Sputter initiated - will degrade strength (origin ${origin})`);
+        // console.log(`[DEBUG] Force Sputter initiated - will degrade strength (origin ${origin})`);
       }
     };
 
@@ -534,7 +534,7 @@ export class StadiumScene extends Phaser.Scene {
         const waveSprite = this.waveManager.getWaveSprite();
         if (waveSprite && typeof waveSprite.toggleDebugVisible === 'function') {
           waveSprite.toggleDebugVisible();
-          console.log('[DEBUG] Wave debug visualization toggled');
+          // console.log('[DEBUG] Wave debug visualization toggled');
         }
       }
     });
@@ -544,11 +544,11 @@ export class StadiumScene extends Phaser.Scene {
       const section = sectionData.id.toLowerCase();
       document.getElementById(`v1-${section}`)?.addEventListener('click', () => {
         this.aiManager.assignVendorToSection(0, sectionIdx);
-        console.log(`[UI] Assigned vendor 0 to section ${sectionData.id} (index ${sectionIdx})`);
+        // console.log(`[UI] Assigned vendor 0 to section ${sectionData.id} (index ${sectionIdx})`);
       });
       document.getElementById(`v2-${section}`)?.addEventListener('click', () => {
         this.aiManager.assignVendorToSection(1, sectionIdx);
-        console.log(`[UI] Assigned vendor 1 to section ${sectionData.id} (index ${sectionIdx})`);
+        // console.log(`[UI] Assigned vendor 1 to section ${sectionData.id} (index ${sectionIdx})`);
       });
     });
 
@@ -595,7 +595,7 @@ export class StadiumScene extends Phaser.Scene {
     // Listen to AIManager's processed wave events for UI updates
     this.aiManager.on('waveSuccessProcessed', (data: any) => {
       if (data.type === 'full') {
-        console.log('[StadiumScene] waveFullSuccess - triggering camera shake');
+        // console.log('[StadiumScene] waveFullSuccess - triggering camera shake');
         this.cameras.main.shake(200, 0.005);
       }
     });
@@ -617,7 +617,7 @@ export class StadiumScene extends Phaser.Scene {
 
     // Listen to vendor collisions (Phase 3.1)
     this.waveManager.on('vendorCollision', (data: { actorId: string; sectionId: string; pointsAtRisk: number; vendorPosition: { row: number; col: number }; waveColumn: number }) => {
-      console.log(`[StadiumScene.vendorCollision] 💥 Vendor ${data.actorId} hit in section ${data.sectionId}! Points at risk: ${data.pointsAtRisk}`);
+      // console.log(`[StadiumScene.vendorCollision] 💥 Vendor ${data.actorId} hit in section ${data.sectionId}! Points at risk: ${data.pointsAtRisk}`);
       // TODO Phase 3.2: Apply collision penalties via SectionActor
       // TODO Phase 3.3: Roll for splat and apply consequences
     });
@@ -634,32 +634,32 @@ export class StadiumScene extends Phaser.Scene {
       const sectionActor = sectionActors[sectionIndex] as SectionActor;
       
       if (!sectionActor) {
-        console.warn(`[StadiumScene.columnWaveReached] No SectionActor for section ${data.sectionId} index ${sectionIndex}`);
+        // console.warn(`[StadiumScene.columnWaveReached] No SectionActor for section ${data.sectionId} index ${sectionIndex}`);
         return;
       }
       
       if (data.seatIds.length === 0) {
-        console.warn(`[StadiumScene.columnWaveReached] No seats for section ${data.sectionId} col ${data.gridCol}`);
+        // console.warn(`[StadiumScene.columnWaveReached] No seats for section ${data.sectionId} col ${data.gridCol}`);
         return;
       }
       
       const firstSeatId = data.seatIds[0];
-      console.log(`[StadiumScene.columnWaveReached] First seatId: ${firstSeatId}`);
+      // console.log(`[StadiumScene.columnWaveReached] First seatId: ${firstSeatId}`);
       const parts = firstSeatId.split('-');
-      console.log(`[StadiumScene.columnWaveReached] SeatId parts: ${parts.join(', ')}, length: ${parts.length}`);
+      // console.log(`[StadiumScene.columnWaveReached] SeatId parts: ${parts.join(', ')}, length: ${parts.length}`);
       
       // SeatId format is: ${sectionId}-${rowIndex}-${col}
       if (parts.length < 3) {
-        console.warn(`[StadiumScene.columnWaveReached] Invalid seatId format: ${firstSeatId}`);
+        // console.warn(`[StadiumScene.columnWaveReached] Invalid seatId format: ${firstSeatId}`);
         return;
       }
       const columnIndex = parseInt(parts[2], 10);
       if (isNaN(columnIndex)) {
-        console.warn(`[StadiumScene.columnWaveReached] Invalid columnIndex from seatId: ${firstSeatId}`);
+        // console.warn(`[StadiumScene.columnWaveReached] Invalid columnIndex from seatId: ${firstSeatId}`);
         return;
       }
 
-      console.log(`[StadiumScene.columnWaveReached] Parsed columnIndex: ${columnIndex}`);
+      // console.log(`[StadiumScene.columnWaveReached] Parsed columnIndex: ${columnIndex}`);
 
       // Use waveStrength and visualState from event payload
       const waveStrength = data.waveStrength ?? this.waveManager.getCurrentWaveStrength();
@@ -691,7 +691,7 @@ export class StadiumScene extends Phaser.Scene {
       
       // Log every few columns to reduce spam
       if (this.waveManager['currentGridColumnIndex'] % 5 === 0) {
-        console.log(`[Column Wave] Section ${data.sectionId} col ${columnIndex}: ${columnState} (${Math.round(columnRate*100)}%)`);
+        // console.log(`[Column Wave] Section ${data.sectionId} col ${columnIndex}: ${columnState} (${Math.round(columnRate*100)}%)`);
       }
     });
 
@@ -718,7 +718,7 @@ export class StadiumScene extends Phaser.Scene {
       const sectionIndex = this.getSectionIndex(data.sectionId);
       const section = this.sections[sectionIndex];
       
-      console.log(`[StadiumScene.sectionComplete] Section ${data.sectionId} ${data.state}`);
+      // console.log(`[StadiumScene.sectionComplete] Section ${data.sectionId} ${data.state}`);
       
       // Trigger section flash based on result
       if (data.state === 'success') {
@@ -856,9 +856,9 @@ export class StadiumScene extends Phaser.Scene {
 
     // Debug: Log once to confirm update is running
     if (!this.hasLoggedUpdate) {
-      console.log('[StadiumScene] UPDATE LOOP IS RUNNING');
-      console.log('[StadiumScene] waveAutonomous.enabled =', gameBalance.waveAutonomous.enabled);
-      console.log('[StadiumScene] Wave manager active =', this.waveManager.isActive());
+      // console.log('[StadiumScene] UPDATE LOOP IS RUNNING');
+      // console.log('[StadiumScene] waveAutonomous.enabled =', gameBalance.waveAutonomous.enabled);
+      // console.log('[StadiumScene] Wave manager active =', this.waveManager.isActive());
       this.hasLoggedUpdate = true;
     }
 
@@ -877,7 +877,9 @@ export class StadiumScene extends Phaser.Scene {
     // Universal actor orchestration through AIManager (Phase 3 complete)
     // AIManager handles: scenery → utility → fans → vendors → mascots
     // Stat decay now happens per-fan via FanActor.update()
-    this.aiManager.update(delta, this);
+    // Get round time from GameStateManager for time-aware behavior
+    const roundTime = this.gameState.getRoundTime();
+    this.aiManager.update(delta, roundTime, this);
 
     // Sync section-level stats from fan aggregates for UI display
     // (Aggregates are now updated by SectionActor.update() in AIManager)
@@ -901,10 +903,10 @@ export class StadiumScene extends Phaser.Scene {
     this.renderVendorGridLabels();
 
     // Update mascot positions and states
-    this.updateMascots(delta);
+    this.updateMascots(delta, roundTime);
 
     // Tick wave sprite movement and events (sprite-driven propagation)
-    this.waveManager.update(delta);
+    this.waveManager.update(delta, roundTime);
 
     // Update overlay manager (clean up finished overlays)
     if (this.overlayManager) {
@@ -919,7 +921,7 @@ export class StadiumScene extends Phaser.Scene {
       if (triggerSection) {
         const wave = this.waveManager.createWave(triggerSection);
         this.showIncomingCue(triggerSection);
-        console.log(`[Wave] Autonomous start section ${triggerSection} waveId=${wave.id}`);
+        // console.log(`[Wave] Autonomous start section ${triggerSection} waveId=${wave.id}`);
       }
     }
 
@@ -992,7 +994,7 @@ export class StadiumScene extends Phaser.Scene {
     // - Blue blink effect on section sprite
     // - Countdown text below section (using sectionStatOffsetY from config)
     // - Duration from gameBalance.waveAutonomous.incomingCueDuration
-    console.log(`[Incoming Cue] Wave starting from section ${sectionId}`);
+    // console.log(`[Incoming Cue] Wave starting from section ${sectionId}`);
   }
 
   /**
@@ -1004,7 +1006,7 @@ export class StadiumScene extends Phaser.Scene {
     // TODO: Implement particle spray using Phaser.GameObjects.Particles
     // - Simple upward spray of particles
     // - Short duration (1-2 seconds)
-    console.log(`[Particle Effect] Wave start at (${x}, ${y})`);
+    // console.log(`[Particle Effect] Wave start at (${x}, ${y})`);
   }
 
   /**
@@ -1245,7 +1247,7 @@ export class StadiumScene extends Phaser.Scene {
     const sessionScore = this.gameState.calculateSessionScore();
 
     if (this.debugMode) {
-      console.log('Session ended with score:', sessionScore);
+      // console.log('Session ended with score:', sessionScore);
     }
 
     // Clean up actor registry
@@ -1311,7 +1313,7 @@ export class StadiumScene extends Phaser.Scene {
       const val = parseFloat(strengthInput.value);
       if (!isNaN(val)) {
         this.waveManager.setWaveStrength(val);
-        console.log(`[DEBUG] Override strength=${val}`);
+        // console.log(`[DEBUG] Override strength=${val}`);
         this.updateDebugStats();
       }
     };
@@ -1342,10 +1344,10 @@ export class StadiumScene extends Phaser.Scene {
       this.waveManager.setForceSputter(true);
       if (autoRecoverChk.checked) {
         this.waveManager.applyWaveBooster('recovery');
-        console.log('[DEBUG] Recovery booster applied');
+        // console.log('[DEBUG] Recovery booster applied');
       }
       this.startWaveWithDisable(forceSputterBtn);
-      console.log('[DEBUG] Forced sputter requested');
+      // console.log('[DEBUG] Forced sputter requested');
       this.updateDebugStats();
     };
     sputterRow.appendChild(forceSputterBtn);
@@ -1366,7 +1368,7 @@ export class StadiumScene extends Phaser.Scene {
       // Briefly disable button to prevent rapid repeat
       forceDeathBtn.disabled = true;
       this.time.delayedCall(1500, () => { forceDeathBtn.disabled = false; });
-      console.log(`[DEBUG] Forced death requested (origin ${origin})`);
+      // console.log(`[DEBUG] Forced death requested (origin ${origin})`);
       this.updateDebugStats();
     };
     deathRow.appendChild(forceDeathBtn);
@@ -1386,7 +1388,7 @@ export class StadiumScene extends Phaser.Scene {
       btn.style.cssText = `background:#111;border:1px solid ${b.color};color:${b.color};font-size:11px;padding:2px 6px;cursor:pointer;flex:1;`;
       btn.onclick = () => {
         this.waveManager.applyWaveBooster(b.key);
-        console.log(`[DEBUG] Booster applied: ${b.key}`);
+        // console.log(`[DEBUG] Booster applied: ${b.key}`);
         this.updateDebugStats();
       };
       boosterRow.appendChild(btn);
@@ -1420,7 +1422,7 @@ export class StadiumScene extends Phaser.Scene {
       dKey.on('down', () => {
         debugPanelVisible = !debugPanelVisible;
         debugPanel.style.display = debugPanelVisible ? 'block' : 'none';
-        console.log('[DEBUG PANEL]', debugPanelVisible ? 'VISIBLE' : 'HIDDEN');
+        // console.log('[DEBUG PANEL]', debugPanelVisible ? 'VISIBLE' : 'HIDDEN');
       });
     }
 
@@ -1430,11 +1432,11 @@ export class StadiumScene extends Phaser.Scene {
       wKey.on('down', () => {
         const newValue = !gameBalance.waveSprite.visible;
         gameBalance.waveSprite.visible = newValue;
-        console.log('[WAVE SPRITE]', newValue ? 'VISIBLE' : 'HIDDEN');
+        // console.log('[WAVE SPRITE]', newValue ? 'VISIBLE' : 'HIDDEN');
       });
     }
 
-    console.log('[DEBUG PANEL] Created. Press D to toggle. Press S to force sputter. Press W to toggle wave sprite.');
+    // console.log('[DEBUG PANEL] Created. Press D to toggle. Press S to force sputter. Press W to toggle wave sprite.');
 
     // Clean up on scene shutdown
     this.events.on('shutdown', () => {
@@ -1509,7 +1511,7 @@ export class StadiumScene extends Phaser.Scene {
   private setupVendorEventListeners(): void {
     // Listen for vendor spawned events to create visual sprites
     this.aiManager.on('vendorSpawned', (data: { vendorId: number; profile: any }) => {
-      console.log(`[Vendor] Spawned vendor ${data.vendorId}`);
+      // console.log(`[Vendor] Spawned vendor ${data.vendorId}`);
       const { vendorId, profile } = data;
       
       // Get vendor actor and its sprite
@@ -1517,16 +1519,16 @@ export class StadiumScene extends Phaser.Scene {
       const vendorSprite = vendorActor?.getVendor();
       if (vendorSprite) {
         this.vendorSprites.set(vendorId, vendorSprite);
-        console.log(`[Vendor] Sprite created at (${vendorSprite.x}, ${vendorSprite.y})`);
-        console.log(`[Vendor] Total sprites: ${this.vendorSprites.size}`);
+        // console.log(`[Vendor] Sprite created at (${vendorSprite.x}, ${vendorSprite.y})`);
+        // console.log(`[Vendor] Total sprites: ${this.vendorSprites.size}`);
       }
-      console.log(`[Vendor] Profile type=${profile.type} quality=${profile.qualityTier}`);
+      // console.log(`[Vendor] Profile type=${profile.type} quality=${profile.qualityTier}`);
       this.rebuildVendorControls();
     });
 
     // Listen for vendor state changes to update visuals
     this.aiManager.on('vendorReachedTarget', (data: { vendorId: number; position: any }) => {
-      console.log(`[Vendor] Vendor ${data.vendorId} reached target`);
+      // console.log(`[Vendor] Vendor ${data.vendorId} reached target`);
     });
 
     this.aiManager.on('serviceComplete', (data: { vendorId: number; fanServed?: boolean }) => {
@@ -1534,7 +1536,7 @@ export class StadiumScene extends Phaser.Scene {
       if (sprite) {
         sprite.setMovementState('cooldown');
       }
-      console.log(`[Vendor] Vendor ${data.vendorId} completed service`);
+      // console.log(`[Vendor] Vendor ${data.vendorId} completed service`);
     });
 
     this.aiManager.on('vendorDistracted', (data: { vendorId: number }) => {
@@ -1542,20 +1544,20 @@ export class StadiumScene extends Phaser.Scene {
       if (sprite) {
         sprite.setMovementState('distracted');
       }
-      console.log(`[Vendor] Vendor ${data.vendorId} got distracted!`);
+      // console.log(`[Vendor] Vendor ${data.vendorId} got distracted!`);
     });
 
     // Vendor section assignment
     this.aiManager.on('vendorSectionAssigned', (data: { vendorId: number; sectionIdx: number }) => {
       const sectionId = this.levelData?.sections[data.sectionIdx]?.id || 'Unknown';
-      console.log(`[Vendor] Vendor ${data.vendorId} assigned to section ${sectionId}`);
+      // console.log(`[Vendor] Vendor ${data.vendorId} assigned to section ${sectionId}`);
       // Update UI highlight
       this.rebuildVendorControls();
     });
 
     // Vendor dropoff event (scoring)
     this.aiManager.on('vendorDropoff', (data: { actorId: string; pointsEarned: number }) => {
-      console.log(`[Vendor] Vendor ${data.actorId} dropped off ${data.pointsEarned} points`);
+      // console.log(`[Vendor] Vendor ${data.actorId} dropped off ${data.pointsEarned} points`);
       
       // Add score to GameStateManager
       this.gameState.addVendorScore(data.pointsEarned);
@@ -1633,10 +1635,10 @@ export class StadiumScene extends Phaser.Scene {
       if (availableMascot && availableSection) {
         availableMascot.activateInSection(availableSection, 'manual');
         this.mascotSectionMap.set(availableSection.getId(), availableMascot);
-        console.log(`[MascotActor] Activated mascot in section ${availableSection.getId()}`);
+        // console.log(`[MascotActor] Activated mascot in section ${availableSection.getId()}`);
         availableMascot.getSprite().setVisible(true);
       } else {
-        console.log('[MascotActor] No available mascot or section');
+        // console.log('[MascotActor] No available mascot or section');
       }
     });
 
@@ -1653,7 +1655,7 @@ export class StadiumScene extends Phaser.Scene {
 
         // Check if section already has a mascot
         if (this.mascotSectionMap.has(section.getId())) {
-          console.log(`[Mascot] Section ${section.getId()} already has a mascot`);
+          // console.log(`[Mascot] Section ${section.getId()} already has a mascot`);
           return;
         }
 
@@ -1661,9 +1663,9 @@ export class StadiumScene extends Phaser.Scene {
           availableMascot.activateInSection(section, 'manual');
           this.mascotSectionMap.set(section.getId(), availableMascot);
           availableMascot.getSprite().setVisible(true);
-          console.log(`[MascotActor] Activated mascot in section ${section.getId()} (index ${sectionIndex})`);
+          // console.log(`[MascotActor] Activated mascot in section ${section.getId()} (index ${sectionIndex})`);
         } else {
-          console.log('[MascotActor] No available mascot (all in cooldown or active)');
+          // console.log('[MascotActor] No available mascot (all in cooldown or active)');
         }
       });
     }
@@ -1674,7 +1676,7 @@ export class StadiumScene extends Phaser.Scene {
     aKey.on('down', () => {
       this.autoRotationMode = !this.autoRotationMode;
       this.mascotActors.forEach(m => m.setMovementMode(this.autoRotationMode ? 'auto' : 'manual'));
-      console.log(`[MascotActor] Auto-rotation mode: ${this.autoRotationMode ? 'ON' : 'OFF'}`);
+      // console.log(`[MascotActor] Auto-rotation mode: ${this.autoRotationMode ? 'ON' : 'OFF'}`);
     });
   }
 
@@ -1731,9 +1733,9 @@ export class StadiumScene extends Phaser.Scene {
   /**
    * Update mascot positions and handle deactivation cleanup
    */
-  private updateMascots(delta: number): void {
+  private updateMascots(delta: number, roundTime: number): void {
     this.mascotActors.forEach(actor => {
-      actor.update(delta);
+      actor.update(delta, roundTime);
       // Section cleanup when actor deactivates
       if (!actor.isPatrolling() && actor.getAssignedSection()) {
         const sectionId = actor.getAssignedSection()?.getId();
@@ -1760,7 +1762,7 @@ export class StadiumScene extends Phaser.Scene {
       actor.activateInSection(availableSection, 'auto');
       this.mascotSectionMap.set(availableSection.getId(), actor);
       actor.getSprite().setVisible(true);
-      console.log(`[MascotActor Auto-Rotation] Activated mascot in section ${availableSection.getId()}`);
+      // console.log(`[MascotActor Auto-Rotation] Activated mascot in section ${availableSection.getId()}`);
     }
   }
 
@@ -1783,7 +1785,7 @@ export class StadiumScene extends Phaser.Scene {
 
     // Use vendorActors map (new actor-based system)
     const vendorActors = Array.from(this.aiManager.getVendorActors().entries());
-    console.log(`[rebuildVendorControls] Building controls for ${vendorActors.length} vendors`);
+    // console.log(`[rebuildVendorControls] Building controls for ${vendorActors.length} vendors`);
     
     vendorActors.forEach(([vendorId, vendorActor], displayIndex) => {
       const row = document.createElement('div');
@@ -1814,10 +1816,10 @@ export class StadiumScene extends Phaser.Scene {
       btn.onclick = () => {
         const liveCooldown = this.aiManager.isVendorOnCooldown(vendorId);
         if (liveCooldown) {
-          console.log(`[VendorControls] Click ignored; vendor ${vendorId} still on cooldown`);
+          // console.log(`[VendorControls] Click ignored; vendor ${vendorId} still on cooldown`);
           return;
         }
-        console.log(`[VendorControls] Initiating targeting for vendor ${vendorId}`);
+        // console.log(`[VendorControls] Initiating targeting for vendor ${vendorId}`);
         this.enterVendorTargetingMode(vendorId);
       };
       row.appendChild(btn);
@@ -1875,12 +1877,12 @@ export class StadiumScene extends Phaser.Scene {
    */
   private enterVendorTargetingMode(vendorId: number): void {
     if (this.vendorTargetingActive !== null) {
-      console.warn('[StadiumScene] Already in targeting mode');
+      // console.warn('[StadiumScene] Already in targeting mode');
       return;
     }
     
     this.vendorTargetingActive = vendorId;
-    console.log(`[StadiumScene] Entered targeting mode for vendor ${vendorId}`);
+    // console.log(`[StadiumScene] Entered targeting mode for vendor ${vendorId}`);
     
     // Show reticle
     if (this.targetingReticle) {
@@ -1904,7 +1906,7 @@ export class StadiumScene extends Phaser.Scene {
     if (this.vendorTargetingActive === null) return;
     
     const vendorId = this.vendorTargetingActive;
-    console.log(`[StadiumScene] Exited targeting mode for vendor ${vendorId}`);
+    // console.log(`[StadiumScene] Exited targeting mode for vendor ${vendorId}`);
     
     // Hide reticle
     if (this.targetingReticle) {
@@ -1932,7 +1934,7 @@ export class StadiumScene extends Phaser.Scene {
     // Convert world coordinates to grid
     const gridPos = this.gridManager.worldToGrid(pointer.worldX, pointer.worldY);
     if (!gridPos) {
-      console.log('[StadiumScene] Click outside grid bounds, cancelling targeting');
+      // console.log('[StadiumScene] Click outside grid bounds, cancelling targeting');
       this.exitVendorTargetingMode();
       return;
     }
@@ -1940,7 +1942,7 @@ export class StadiumScene extends Phaser.Scene {
     // Validate click: allow 'seat' zone only
     const cell = this.gridManager.getCell(gridPos.row, gridPos.col);
     if (!cell || cell.zoneType !== 'seat') {
-      console.log('[StadiumScene] Click on non-seat tile, cancelling targeting');
+      // console.log('[StadiumScene] Click on non-seat tile, cancelling targeting');
       this.exitVendorTargetingMode();
       return;
     }
@@ -1948,13 +1950,13 @@ export class StadiumScene extends Phaser.Scene {
     // Determine which section this seat belongs to
     const sectionIdx = this.getSectionAtGridPosition(gridPos.row, gridPos.col);
     if (sectionIdx === null) {
-      console.log('[StadiumScene] Could not determine section for clicked seat');
+      // console.log('[StadiumScene] Could not determine section for clicked seat');
       this.exitVendorTargetingMode();
       return;
     }
     
     // Assign vendor to section
-    console.log(`[StadiumScene] Assigning vendor ${this.vendorTargetingActive} to section ${sectionIdx} via click at grid (${gridPos.row},${gridPos.col})`);
+    // console.log(`[StadiumScene] Assigning vendor ${this.vendorTargetingActive} to section ${sectionIdx} via click at grid (${gridPos.row},${gridPos.col})`);
     this.aiManager.assignVendorToSection(this.vendorTargetingActive, sectionIdx, gridPos.row, gridPos.col);
     
     // Exit targeting mode
@@ -1987,15 +1989,15 @@ export class StadiumScene extends Phaser.Scene {
       
       // Debug logging for row 15
       if (row === 15 && col >= colStart && col <= colEnd) {
-        console.log(`[getSectionAtGridPosition] Checking row=${row}, col=${col}`, {
-          sectionId: sectionData.id,
-          rowStart,
-          rowEnd,
-          colStart,
-          colEnd,
-          rowInRange: row >= rowStart && row <= rowEnd,
-          colInRange: col >= colStart && col <= colEnd
-        });
+        // console.log(`[getSectionAtGridPosition] Checking row=${row}, col=${col}`, {
+        //   sectionId: sectionData.id,
+        //   rowStart,
+        //   rowEnd,
+        //   colStart,
+        //   colEnd,
+        //   rowInRange: row >= rowStart && row <= rowEnd,
+        //   colInRange: col >= colStart && col <= colEnd
+        // });
       }
       
       if (row >= rowStart && row <= rowEnd && col >= colStart && col <= colEnd) {
@@ -2099,7 +2101,7 @@ export class StadiumScene extends Phaser.Scene {
 
     // Check zone, allow seats and rowEntry boundary cells on seat rows
     const zone = this.gridManager.getZoneType(gridPos.row, gridPos.col);
-    console.log(`[TargetingReticle] Hovered cell at row=${gridPos.row}, col=${gridPos.col}, zoneType=${zone}`);
+    // console.log(`[TargetingReticle] Hovered cell at row=${gridPos.row}, col=${gridPos.col}, zoneType=${zone}`);
     const sectionIdx = this.getSectionAtGridPosition(gridPos.row, gridPos.col);
     const isValidTarget = zone === 'seat' && sectionIdx !== null;
 

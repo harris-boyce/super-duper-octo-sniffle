@@ -45,11 +45,11 @@ export class LoggerService {
     const catFlag = this.config.consoleCategories;
     if (Object.keys(catFlag).length > 0 && catFlag[evt.category] === false) return;
     if (evt.level === 'error') {
-      console.error(`[${evt.category}] ${evt.message}`, evt.data || '');
+      // console.error(`[${evt.category}] ${evt.message}`, evt.data || '');
     } else if (evt.level === 'warn') {
-      console.warn(`[${evt.category}] ${evt.message}`);
+      // console.warn(`[${evt.category}] ${evt.message}`);
     } else if (evt.level === 'info' || evt.level === 'event') {
-      console.log(`[${evt.category}] ${evt.message}`);
+      // console.log(`[${evt.category}] ${evt.message}`);
     } else if (evt.level === 'debug') {
       console.debug(`[${evt.category}] ${evt.message}`);
     }

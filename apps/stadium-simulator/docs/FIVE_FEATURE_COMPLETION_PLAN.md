@@ -1,7 +1,7 @@
 # Five-Feature Game Completion Pass
 
-**Status**: In Progress  
-**Branch**: `sb/fix-pathfinding-and-target-acquisition`  
+**Status**: Partially Complete  
+**Branch**: `sb/add-vendor-scoring-and-splat`  
 **Start Date**: November 30, 2025
 
 ## Overview
@@ -49,9 +49,9 @@ This plan adds five major features to complete the core game loop:
 **Files**: `GridManager.ts`, `GridPathfinder.ts`
 
 - [ ] Add `dropZone` flag parsing in `loadFromConfig()`
-- [ ] Implement `getDropZones(): {row, col}[]` query method
-- [ ] Update `GridPathfinder` A* neighbor selection to respect directional walls
-- [ ] Test pathfinding to drop zones from various positions
+- ✅ Implement `getDropZones(): {row, col}[]` query method
+- ✅ Update `GridPathfinder` A* neighbor selection to respect directional walls
+- ✅ Test pathfinding to drop zones from various positions
 
 **Verification**:
 - `getDropZones()` returns correct positions
@@ -78,13 +78,13 @@ This plan adds five major features to complete the core game loop:
 ### 2.1 Add Point Tracking to Vendor Behavior
 **Files**: `DrinkVendorBehavior.ts`, `VendorActor.ts`
 
-- [ ] Add `pointsEarned: number` field to behavior state
+- ✅ Add `pointsEarned: number` field to behavior state
 - [ ] Increment points on `serviceComplete` event:
   - Base: +1 point
   - High thirst (>80): +2 points
   - Low happiness (<20): +3 points
-- [ ] Add getter `getPointsEarned()` for external queries
-- [ ] Reset points to 0 on dropoff completion
+- ✅ Add getter `getPointsEarned()` for external queries
+- ✅ Reset points to 0 on dropoff completion
 
 **Verification**:
 - Points accumulate correctly on service
@@ -96,11 +96,11 @@ This plan adds five major features to complete the core game loop:
 ### 2.2 Create DropZoneActor
 **Files**: `DropZoneActor.ts` (new), `ActorFactory.ts`
 
-- [ ] Create `DropZoneActor` extending `SceneryActor`
+- ✅ Create `DropZoneActor` extending `SceneryActor`
 - [ ] Add dark square sprite (1x1 cell, depth 100)
 - [ ] Implement white outline flash effect (500ms pulse)
-- [ ] Register in `ActorFactory` and `ActorRegistry`
-- [ ] Spawn two drop zones in `StadiumScene.create()` at (15,10) and (15,21)
+- ✅ Register in `ActorFactory` and `ActorRegistry`
+- ✅ Spawn two drop zones in `StadiumScene.create()` at (15,10) and (15,21)
 
 **Verification**:
 - Drop zones visible at corridor locations
@@ -112,14 +112,14 @@ This plan adds five major features to complete the core game loop:
 ### 2.3 Implement Dropoff State Machine
 **Files**: `DrinkVendorBehavior.ts`, `AIManager.ts`
 
-- [ ] Add `droppingOff` state to vendor state machine
-- [ ] Modify `forceRecallPatrol()` to path to nearest drop zone
-- [ ] Implement dropoff sequence:
+- ✅ Add `droppingOff` state to vendor state machine
+- ✅ Modify `forceRecallPatrol()` to path to nearest drop zone
+- ✅ Implement dropoff sequence:
   - Fade out (2s, alpha 1.0→0.0)
   - Unavailable delay (3s)
   - Fade in (1s, alpha 0.0→1.0)
-- [ ] Emit `vendorDropoff` event with `{vendorId, pointsEarned}`
-- [ ] Transition to `awaitingAssignment` after dropoff
+- ✅ Emit `vendorDropoff` event with `{vendorId, pointsEarned}`
+- ✅ Transition to `awaitingAssignment` after dropoff
 
 **Verification**:
 - Vendors path to drop zones on recall
@@ -131,9 +131,9 @@ This plan adds five major features to complete the core game loop:
 ### 2.4 Wire Scoring Integration
 **Files**: `GameStateManager.ts`, `StadiumScene.ts`
 
-- [ ] Add `GameStateManager` listener for `vendorDropoff` event
-- [ ] Call `addScore(points)` on dropoff
-- [ ] Spawn floating text "+X pts" at drop zone position
+- ✅ Add listener in `StadiumScene` for `vendorDropoff` and forward to GameState
+- ✅ Call `addScore(points)` on dropoff
+- ✅ Spawn floating text "+X pts" at drop zone position
   - Depth: 355
   - Color: green
   - Animation: move up 30px + fade over 1.5s
@@ -152,10 +152,10 @@ This plan adds five major features to complete the core game loop:
 **Files**: `WaveSprite.ts`, `WaveManager.ts`
 
 - [ ] Add `checkVendorCollisions(vendors: VendorActor[])` to WaveSprite
-- [ ] Call collision check in `WaveManager.propagateWave()` per column
-- [ ] Query vendors via `ActorRegistry.getByCategory('vendor')`
-- [ ] Check vendor grid position matches wave column ±1 row in seat zones (16-19)
-- [ ] Emit `vendorCollision` event with `{vendorId, sectionId, pointsAtRisk}`
+- ✅ Call collision check in `WaveManager.propagateWave()` per column
+- ✅ Query vendors via `ActorRegistry.getByCategory('vendor')`
+- ✅ Check vendor grid position matches wave column ±1 row in seat zones (16-19)
+- ✅ Emit `vendorCollision` event with `{vendorId, sectionId, pointsAtRisk}`
 
 **Verification**:
 - Collision detection fires when wave hits vendor
@@ -554,6 +554,6 @@ clusterDecay: {
 
 ## Progress Tracking
 
-**Last Updated**: November 30, 2025  
-**Current Phase**: Phase 1 - Grid Configuration & Foundation Updates  
-**Next Step**: 1.1 - Update Stadium Grid Configuration
+**Last Updated**: December 3, 2025  
+**Current Phase**: Phase 2 - Vendor Scoring & Dropoff System  
+**Next Step**: 3.2 - Apply Collision Penalties; 3.3 - Splat Mechanics; 5.x Announcer overlays; 6.x Fan stat decay

@@ -95,18 +95,18 @@ export class LevelService {
         { id: 'vendor-2', type: 'food', gridRow: 20, gridCol: 20 }
       ];
       
-      console.log('[LevelService] Loaded stadium config:', stadiumConfig);
-      console.log('[LevelService] Stadium config has cellRanges:', !!stadiumConfig.cellRanges, 'count:', stadiumConfig.cellRanges?.length);
-      console.log('[LevelService] Stadium config has cells:', !!stadiumConfig.cells, 'count:', stadiumConfig.cells?.length);
-      console.log('[LevelService] Generated sections:', sections);
+      // console.log('[LevelService] Loaded stadium config:', stadiumConfig);
+      // console.log('[LevelService] Stadium config has cellRanges:', !!stadiumConfig.cellRanges, 'count:', stadiumConfig.cellRanges?.length);
+      // console.log('[LevelService] Stadium config has cells:', !!stadiumConfig.cells, 'count:', stadiumConfig.cells?.length);
+      // console.log('[LevelService] Generated sections:', sections);
       
       const result = { gridConfig: stadiumConfig, sections, vendors, stairs };
-      console.log('[LevelService] Returning result.gridConfig has cellRanges:', !!result.gridConfig.cellRanges);
+      // console.log('[LevelService] Returning result.gridConfig has cellRanges:', !!result.gridConfig.cellRanges);
       
       return result;
       
     } catch (error) {
-      console.error('[LevelService] Failed to load level data:', error);
+      // console.error('[LevelService] Failed to load level data:', error);
       
       // Fallback to hardcoded data if JSON fails
       return this.loadLevelFallback();
@@ -117,7 +117,7 @@ export class LevelService {
    * Fallback hardcoded level data (original implementation)
    */
   private static async loadLevelFallback(): Promise<LevelData> {
-    console.warn('[LevelService] Using fallback hardcoded level data');
+    // console.warn('[LevelService] Using fallback hardcoded level data');
     
     // Section layout: 3 sections, each 8x4, with stairs directly adjacent
     // Section A: gridLeft 2-9 (8 columns, with left gutter)

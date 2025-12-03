@@ -314,7 +314,7 @@ export class Fan extends BaseActorContainer {
         return Promise.resolve();
       
       default:
-        console.warn(`Unknown animation '${animationName}' for Fan`);
+        // console.warn(`Unknown animation '${animationName}' for Fan`);
         return Promise.resolve();
     }
   }

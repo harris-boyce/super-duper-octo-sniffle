@@ -49,10 +49,10 @@ export class WorldScene extends Phaser.Scene {
       
       // Listen for stadiumReady event
       stadiumScene.events.once('stadiumReady', (data: any) => {
-        console.log('[WorldScene] Received stadiumReady event');
+        // console.log('[WorldScene] Received stadiumReady event');
         if (data.aiManager && this.gridOverlay) {
           this.gridOverlay.setAIManager(data.aiManager);
-          console.log('[WorldScene] Connected AIManager to GridOverlay');
+          // console.log('[WorldScene] Connected AIManager to GridOverlay');
         }
       });
     }
@@ -65,7 +65,7 @@ export class WorldScene extends Phaser.Scene {
         if (this.gridOverlay) {
           const newVisibility = !this.gridOverlay.visible;
           this.gridOverlay.setDebugVisible(newVisibility);
-          console.log(`[WorldScene] Grid overlay: ${newVisibility ? 'ON' : 'OFF'}`);
+          // console.log(`[WorldScene] Grid overlay: ${newVisibility ? 'ON' : 'OFF'}`);
         }
       });
 
@@ -84,7 +84,7 @@ export class WorldScene extends Phaser.Scene {
       });
     }
 
-    console.log(`[WorldScene] Initialized (mode=run, debug=${this.debugMode})`);
+    // console.log(`[WorldScene] Initialized (mode=run, debug=${this.debugMode})`);
   }
 
   update(time: number, delta: number): void {

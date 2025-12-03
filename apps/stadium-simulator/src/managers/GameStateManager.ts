@@ -282,6 +282,27 @@ export class GameStateManager {
   }
 
   /**
+   * Get elapsed time since session start in seconds
+   * @returns Elapsed time in seconds
+   */
+  public getSessionElapsedTime(): number {
+    if (this.sessionState === 'idle' || this.sessionState === 'complete') {
+      return 0;
+    }
+    return (Date.now() - this.sessionStartTime) / 1000;
+  }
+
+  /**
+   * Get round time for passing to update calls
+   * @returns Negative value (time remaining) in timed mode, positive (elapsed) in eternal mode
+   */
+  public getRoundTime(): number {
+    // For now, always return negative (time remaining) since we're in timed mode
+    // TODO: Add eternal mode support
+    return -this.sessionTimeRemaining / 1000; // Convert ms to seconds
+  }
+
+  /**
    * Get number of completed waves
    */
   public getCompletedWaves(): number {

@@ -495,12 +495,12 @@ export class GridManager extends BaseManager {
    */
   public loadZoneConfig(config: StadiumSceneConfig): void {
     if (DEBUG_PATHFIND) {
-      console.log('[GridManager] loadZoneConfig called with:', {
-        cellRanges: config.cellRanges?.length ?? 0,
-        cells: config.cells?.length ?? 0,
-        sections: config.sections?.length ?? 0,
-        stairs: config.stairs?.length ?? 0,
-      });
+      // console.log('[GridManager] loadZoneConfig called with:', {
+      //   cellRanges: config.cellRanges?.length ?? 0,
+      //   cells: config.cells?.length ?? 0,
+      //   sections: config.sections?.length ?? 0,
+      //   stairs: config.stairs?.length ?? 0,
+      // });
     }
 
     // Process cell ranges first
@@ -544,12 +544,12 @@ export class GridManager extends BaseManager {
     this.flagGridChanged({ type: 'zonesLoaded' });
     
     if (DEBUG_PATHFIND) {
-      console.log('[GridManager] Zone config loaded. Sample cells:', {
-        '0,0': this.getCell(0, 0)?.zoneType,
-        '14,5': this.getCell(14, 5)?.zoneType,
-        '15,5': this.getCell(15, 5)?.zoneType,
-        '20,5': this.getCell(20, 5)?.zoneType,
-      });
+      // console.log('[GridManager] Zone config loaded. Sample cells:', {
+      //   '0,0': this.getCell(0, 0)?.zoneType,
+      //   '14,5': this.getCell(14, 5)?.zoneType,
+      //   '15,5': this.getCell(15, 5)?.zoneType,
+      //   '20,5': this.getCell(20, 5)?.zoneType,
+      // });
     }
   }
 
@@ -568,8 +568,8 @@ export class GridManager extends BaseManager {
     // Debug: Check if directional flags are present in range
     if (range.zoneType === 'sky') {
       if (DEBUG_PATHFIND) {
-        console.log(`[GridManager] Sky range allowedIncoming.top=${range.allowedIncoming?.top} bottom=${range.allowedIncoming?.bottom} left=${range.allowedIncoming?.left} right=${range.allowedIncoming?.right}`);
-        console.log(`[GridManager] Sky range allowedOutgoing.top=${range.allowedOutgoing?.top} bottom=${range.allowedOutgoing?.bottom} left=${range.allowedOutgoing?.left} right=${range.allowedOutgoing?.right}`);
+        // console.log(`[GridManager] Sky range allowedIncoming.top=${range.allowedIncoming?.top} bottom=${range.allowedIncoming?.bottom} left=${range.allowedIncoming?.left} right=${range.allowedIncoming?.right}`);
+        // console.log(`[GridManager] Sky range allowedOutgoing.top=${range.allowedOutgoing?.top} bottom=${range.allowedOutgoing?.bottom} left=${range.allowedOutgoing?.left} right=${range.allowedOutgoing?.right}`);
       }
     }
 
@@ -630,8 +630,8 @@ export class GridManager extends BaseManager {
     // Debug: Log props for sky cells at edges
     if (props.zoneType === 'sky' && (cell.col === 0 || cell.col === 1 || cell.col === 30 || cell.col === 31) && cell.row === 0) {
       if (DEBUG_PATHFIND) console.log(`[GridManager] applyCellProperties for sky cell (${cell.row},${cell.col})`);
-      console.log(`  props.allowedIncoming:`, props.allowedIncoming);
-      console.log(`  props.allowedIncoming?.top:`, props.allowedIncoming?.top);
+      // console.log(`  props.allowedIncoming:`, props.allowedIncoming);
+      // console.log(`  props.allowedIncoming?.top:`, props.allowedIncoming?.top);
     }
 
     // Set default directional flags based on zone type (before applying explicit flags)
@@ -776,16 +776,16 @@ export class GridManager extends BaseManager {
     }
 
     if (DEBUG_PATHFIND) {
-      console.log(`[GridManager] Built boundary caches: ${this.rowEntryCells.length} rowEntry, ${this.stairLandingCells.length} stairLanding, ${this.corridorEntryCells.length} corridorEntry`);
-      console.log(`[GridManager] Total cells checked: ${totalCellsChecked}, cells with transitionType: ${cellsWithTransitionType}`);
+      // console.log(`[GridManager] Built boundary caches: ${this.rowEntryCells.length} rowEntry, ${this.stairLandingCells.length} stairLanding, ${this.corridorEntryCells.length} corridorEntry`);
+      // console.log(`[GridManager] Total cells checked: ${totalCellsChecked}, cells with transitionType: ${cellsWithTransitionType}`);
     }
     
     // Sample check
     if (cellsWithTransitionType === 0) {
       if (DEBUG_PATHFIND) console.warn('[GridManager] No cells have transitionType set! Checking sample cells:');
-      console.log('  Cell (14,2):', this.getCell(14, 2)?.transitionType);
-      console.log('  Cell (14,10):', this.getCell(14, 10)?.transitionType);
-      console.log('  Cell (19,10):', this.getCell(19, 10)?.transitionType);
+      // console.log('  Cell (14,2):', this.getCell(14, 2)?.transitionType);
+      // console.log('  Cell (14,10):', this.getCell(14, 10)?.transitionType);
+      // console.log('  Cell (19,10):', this.getCell(19, 10)?.transitionType);
     }
   }
 

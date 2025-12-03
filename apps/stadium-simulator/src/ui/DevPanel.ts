@@ -502,5 +502,5 @@ export function initDevPanel(): void {
   }
 
   DevPanel.getInstance();
-  console.log('[DevPanel] Initialized. Press Ctrl+Shift+D to toggle.');
+  // console.log('[DevPanel] Initialized. Press Ctrl+Shift+D to toggle.');
 }

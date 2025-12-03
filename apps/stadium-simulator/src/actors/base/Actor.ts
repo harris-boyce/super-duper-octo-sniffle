@@ -81,8 +81,9 @@ export abstract class Actor {
   /**
    * Update logic called each frame by registry or manager.
    * @param delta Time elapsed since last frame (ms)
+   * @param roundTime Time relative to round start (negative = remaining, positive = elapsed)
    */
-  public abstract update(delta: number): void;
+  public abstract update(delta: number, roundTime?: number): void;
 
   /**
    * Refresh visual/state representation.
@@ -181,7 +182,7 @@ export abstract class AnimatedActor extends Actor {
     return this.currentPathIndex;
   }
 
-  public abstract update(delta: number): void;
+  public abstract update(delta: number, roundTime?: number): void;
   public abstract draw(): void;
 }
 
@@ -196,7 +197,7 @@ export abstract class SceneryActor extends Actor {
   }
 
   // Scenery typically doesn't animate
-  public update(delta: number): void {
+  public update(delta: number, roundTime?: number): void {
     // No-op by default; override if needed
   }
 
@@ -216,7 +217,7 @@ export abstract class UtilityActor extends Actor {
     super(id, type, category, x, y, enableLogging);
   }
 
-  public abstract update(delta: number): void;
+  public abstract update(delta: number, roundTime?: number): void;
 
   // Non-visual actors don't draw
   public draw(): void {

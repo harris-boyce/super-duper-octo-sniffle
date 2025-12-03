@@ -1,5 +1,6 @@
 import { AnimatedActor } from '@/actors/base/Actor';
 import { Vendor } from '@/sprites/Vendor';
+import { gameBalance } from '@/config/gameBalance';
 import PersonalityIntegrationManager from '@/systems/PersonalityIntegrationManager';
 import type { GridManager } from '@/managers/GridManager';
 import type { ActorCategory } from '@/actors/interfaces/ActorTypes';
@@ -56,12 +57,12 @@ export class VendorActor extends AnimatedActor {
         this.gridCol = gridPos.col;
         const depth = this.gridManager.getDepthForPosition(gridPos.row, gridPos.col);
         this.vendor.setDepth(depth);
-        console.log(`[VendorActor] Init depth for vendor at grid (${gridPos.row},${gridPos.col}): ${depth}`);
+        if (gameBalance.debug.vendorActorLogs) console.log(`[VendorActor] Init depth for vendor at grid (${gridPos.row},${gridPos.col}): ${depth}`);
       } else {
         const fallbackDepth = this.gridManager.getDepthForWorld(x, y);
         if (typeof fallbackDepth === 'number') {
           this.vendor.setDepth(fallbackDepth);
-          console.log(`[VendorActor] Init fallback depth: ${fallbackDepth}`);
+          if (gameBalance.debug.vendorActorLogs) console.log(`[VendorActor] Init fallback depth: ${fallbackDepth}`);
         }
       }
     }
@@ -148,7 +149,7 @@ export class VendorActor extends AnimatedActor {
 
     const currentSegment = path[this.currentPathIndex];
     if (!currentSegment) {
-      console.warn('[VendorActor] Current segment is null at index', this.currentPathIndex, 'path length:', path.length);
+      // console.warn('[VendorActor] Current segment is null at index', this.currentPathIndex, 'path length:', path.length);
       return;
     }
 
@@ -245,10 +246,12 @@ export class VendorActor extends AnimatedActor {
   /**
    * Update vendor actor (called each frame)
    * Override in subclasses to add behavior
+   * @param delta - Time elapsed in milliseconds
+   * @param roundTime - Time relative to round start (negative = remaining, positive = elapsed)
    */
-  public update(delta: number): void {
+  public update(delta: number, roundTime: number): void {
     // Base implementation does nothing
-    // Subclasses override to delegate to behavior.tick()
+    // Subclasses override to delegate to behavior.tick(delta, roundTime)
   }
 
   /**
@@ -272,7 +275,7 @@ export class VendorActor extends AnimatedActor {
       this.vendor.setDepth(depth);
       // Debug log occasionally
       if (Math.random() < 0.01) {
-        console.log(`[VendorActor] Update depth at grid (${coords.row},${coords.col}): ${depth} (base: ${baseDepth}), actual depth: ${this.vendor.depth}`);
+        if (gameBalance.debug.vendorActorLogs) console.log(`[VendorActor] Update depth at grid (${coords.row},${coords.col}): ${depth} (base: ${baseDepth}), actual depth: ${this.vendor.depth}`);
       }
     } else {
       const depth = this.gridManager.getDepthForWorld(x, y);

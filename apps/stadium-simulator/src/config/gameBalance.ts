@@ -4,6 +4,13 @@
  */
 
 export const gameBalance = {
+  debug: {
+    sceneLogs: false,
+    vendorActorLogs: false,
+    aiManagerLogs: false,
+    vendorBehaviorLogs: false,
+    waveVerboseLogs: false
+  },
   /**
    * Fan stat configuration
    */
@@ -338,6 +345,9 @@ export const gameBalance = {
     emptySeatPenalty: 0, // no penalty for empty seats
     grumpPenaltyMultiplier: 2.0, // multiply base penalty by this for grumps
     maxTerrainPenalty: 0.90, // cap total penalty at 90% slowdown
+    
+    // Wave collision mechanics
+    waveCollisionPenalty: -30, // penalty to fan's wave participation chance when vendor present
     
     // Pathfinding parameters
     detourToleranceBase: 0.25, // penalty threshold to trigger local detour search

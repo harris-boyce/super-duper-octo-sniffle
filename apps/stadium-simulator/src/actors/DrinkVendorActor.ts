@@ -27,8 +27,10 @@ export class DrinkVendorActor extends VendorActor {
 
   /**
    * Update vendor actor - delegates to behavior
+   * @param delta - Time elapsed in milliseconds
+   * @param roundTime - Time relative to round start (negative = remaining, positive = elapsed)
    */
-  public update(delta: number): void {
+  public update(delta: number, roundTime: number): void {
     const behaviorState = this.behavior.getState();
     const hasPath = this.hasPath();
     const pathLength = hasPath ? this.getPath().length : 0;
@@ -36,11 +38,11 @@ export class DrinkVendorActor extends VendorActor {
 
     // Log state occasionally (every 60 frames ~= 1 second)
     if (Math.random() < 0.017) {
-      console.log('[DrinkVendorActor] State:', behaviorState, '| hasPath:', hasPath, '| path:', pathLength, 'cells | index:', pathIndex);
+      // console.log('[DrinkVendorActor] State:', behaviorState, '| hasPath:', hasPath, '| path:', pathLength, 'cells | index:', pathIndex);
     }
 
     // Update behavior state machine first
-    this.behavior.tick(delta);
+    this.behavior.tick(delta, roundTime);
 
     if (hasPath) {
       this.updateMovement(delta);
@@ -88,16 +90,16 @@ export class DrinkVendorActor extends VendorActor {
       const withinTolerance = rowDiff <= 1 && colDiff <= 1;
       
       if (dropZone && withinTolerance) {
-        console.log('[DrinkVendorActor] ✓ Reached drop zone (tolerance), pos:', pos, 'target:', dropZone, 'calling onArrival()');
+        // console.log('[DrinkVendorActor] ✓ Reached drop zone (tolerance), pos:', pos, 'target:', dropZone, 'calling onArrival()');
         this.behavior.onArrival();
         this.clearPath();
       } else {
-        console.warn('[DrinkVendorActor] At path end but NOT near drop zone:', pos, 'expected:', dropZone, 'rowDiff:', rowDiff, 'colDiff:', colDiff);
+        // console.warn('[DrinkVendorActor] At path end but NOT near drop zone:', pos, 'expected:', dropZone, 'rowDiff:', rowDiff, 'colDiff:', colDiff);
       }
       return;
     }
 
-    console.log('[DrinkVendorActor] ✓ Reached end of path, calling onArrival()');
+    // console.log('[DrinkVendorActor] ✓ Reached end of path, calling onArrival()');
     this.behavior.onArrival();
     this.clearPath();
   }
