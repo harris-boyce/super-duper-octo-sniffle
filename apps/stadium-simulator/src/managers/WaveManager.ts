@@ -116,6 +116,19 @@ export class WaveManager {
     // Sprite may have completed and been destroyed during update()
     if (!this.waveSprite) return;
 
+    // Continuous collision detection: Check all columns the wave is currently covering
+    if (this.activeWave && this.currentGridColumnIndex > 0 && this.currentGridColumnIndex < this.gridColumnSequence.length) {
+      // Check the current column and recent columns (wave might span 1-2 columns)
+      const columnsToCheck = [
+        this.gridColumnSequence[this.currentGridColumnIndex - 1], // Previous column (just passed)
+        this.gridColumnSequence[this.currentGridColumnIndex]      // Current column (approaching)
+      ].filter(Boolean);
+
+      for (const colData of columnsToCheck) {
+        this.checkVendorCollisions(colData.sectionActor.getSectionId(), colData.col);
+      }
+    }
+
     // Snap sprite to grid columns for discrete column-by-column movement
     if (this.gridColumnSequence.length > 0 && this.currentGridColumnIndex < this.gridColumnSequence.length) {
       let triggered = false;
@@ -166,13 +179,13 @@ export class WaveManager {
     
     const colIndex = colData.col - sectionData.gridLeft;
     const rowActors = sectionActor.getRowActors();
-    console.log(`[WaveManager.triggerColumn] Section ${sectionActor.getSectionId()} col ${colData.col} (localCol=${colIndex}), rowActors: ${rowActors.length}`);
+    // console.log(`[WaveManager.triggerColumn] Section ${sectionActor.getSectionId()} col ${colData.col} (localCol=${colIndex}), rowActors: ${rowActors.length}`);
     
     const seatsInColumn = rowActors
       .map((rowActor: any) => rowActor.getSeatAt(colIndex))
       .filter(Boolean);
     
-    console.log(`[WaveManager.triggerColumn] Found ${seatsInColumn.length} seats in column ${colIndex}, emitting columnWaveReached`);
+    // console.log(`[WaveManager.triggerColumn] Found ${seatsInColumn.length} seats in column ${colIndex}, emitting columnWaveReached`);
     
     this.emit('columnWaveReached', {
       sectionId: sectionActor.getSectionId(),
@@ -183,6 +196,101 @@ export class WaveManager {
       waveStrength: this.getCurrentWaveStrength(),
       visualState: this.getColumnVisualState(this.waveSputter.active)
     });
+
+    // Check for vendor collisions in this column
+    this.checkVendorCollisions(sectionActor.getSectionId(), colData.col);
+  }
+
+  /**
+   * Check if any vendors are in collision with the wave at this column
+   * Runtime check: vendor intersects wave column AND occupies a seat with a fan
+   */
+  private checkVendorCollisions(sectionId: string, gridCol: number): void {
+    if (!this.actorRegistry) {
+      console.log(`[WaveManager.checkVendorCollisions] ✗ No actorRegistry available`);
+      return;
+    }
+    if (!this.gridManager) {
+      console.log(`[WaveManager.checkVendorCollisions] ✗ No gridManager available`);
+      return;
+    }
+
+    const vendors = this.actorRegistry.getByCategory('vendor');
+    const seats = this.actorRegistry.getByCategory('seat');
+    const fans = this.actorRegistry.getByCategory('fan');
+
+    console.log(`[WaveManager.checkVendorCollisions] Wave at column ${gridCol} in section ${sectionId}`);
+    console.log(`[WaveManager.checkVendorCollisions] Found: ${vendors.length} vendors, ${seats.length} seats, ${fans.length} fans`);
+
+    // Log all vendors and their positions when wave passes
+    if (vendors.length > 0) {
+      console.log(`[WaveManager] 🔍 Col ${gridCol}: ${vendors.length}v ${seats.length}s ${fans.length}f`);
+      vendors.forEach((v: any) => {
+        const pos = v.getGridPosition();
+        console.log(`  → Vendor ${v.id} at (row:${pos.row}, col:${pos.col})`);
+      });
+    }
+
+    // Check each vendor for collision at this column
+    const vendorsAtColumn = vendors.filter((v: any) => {
+      const pos = v.getGridPosition();
+      return pos.col === gridCol;
+    });
+
+    if (vendorsAtColumn.length > 0) {
+      console.log(`[WaveManager] 🌊 Wave at column ${gridCol}: ${vendorsAtColumn.length} vendor(s) IN WAVE PATH`);
+    }
+
+    for (const vendor of vendors) {
+      const vendorPos = vendor.getGridPosition();
+      
+      // First check: Does vendor intersect this wave column?
+      if (vendorPos.col !== gridCol) {
+        continue;
+      }
+
+      console.log(`[WaveManager] ⚡ STEP 1 PASS: Vendor ${vendor.id} at column ${gridCol} intersects wave`);
+
+      // Second check: Is there a seat actor at vendor's position?
+      const seatAtPosition = seats.find((seat: any) => {
+        const seatPos = seat.getGridPosition();
+        return seatPos.row === vendorPos.row && seatPos.col === vendorPos.col;
+      });
+
+      if (!seatAtPosition) {
+        console.log(`[WaveManager] ✗ No seat found for vendor ${vendor.id} at (${vendorPos.row},${vendorPos.col})`);
+        continue; // Vendor not on a seat
+      }
+
+      // Third check: Is there a fan actor occupying this seat?
+      const fanAtPosition = fans.find((fan: any) => {
+        const fanPos = fan.getGridPosition();
+        return fanPos.row === vendorPos.row && fanPos.col === vendorPos.col;
+      });
+
+      if (!fanAtPosition) {
+        console.log(`[WaveManager] ✗ No fan found at seat ${seatAtPosition.id} (${vendorPos.row},${vendorPos.col})`);
+        continue;
+      }
+
+      // COLLISION CONFIRMED: Vendor + Seat + Fan all at same position where wave passes
+      const vendorActor = vendor as any;
+      const behavior = vendorActor.getBehavior?.();
+      const pointsAtRisk = behavior?.getPointsEarned?.() ?? 0;
+
+      console.log(`[WaveManager] 💥 COLLISION! Vendor ${vendor.id} + Seat ${seatAtPosition.id} + Fan ${fanAtPosition.id} at (${vendorPos.row},${vendorPos.col}) | ${pointsAtRisk} pts at risk`);
+
+      // Emit collision event
+      this.emit('vendorCollision', {
+        actorId: vendor.id,
+        sectionId: sectionId,
+        pointsAtRisk: pointsAtRisk,
+        vendorPosition: vendorPos,
+        waveColumn: gridCol,
+        seatId: seatAtPosition.id,
+        fanId: fanAtPosition.id
+      });
+    }
   }
 
   /**

@@ -558,9 +558,11 @@ export class AIManager {
 
   /**
    * Notify listeners that a vendor has completed dropoff and earned points
+   * @param actorId String actor ID (e.g., 'actor:vendor-0')
+   * @param pointsEarned Points earned from service
    */
-  public notifyVendorDropoff(vendorId: number, pointsEarned: number): void {
-    this.emit('vendorDropoff', { vendorId, pointsEarned });
+  public notifyVendorDropoff(actorId: string, pointsEarned: number): void {
+    this.emit('vendorDropoff', { actorId, pointsEarned });
   }
 
   /**

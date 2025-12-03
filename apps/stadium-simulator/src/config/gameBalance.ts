@@ -710,7 +710,23 @@ export const gameBalance = {
     floatingTextDuration: 1500, // ms for score text animation
     floatingTextRiseDistance: 30, // pixels to rise
     floatingTextColor: 0x00ff00, // green for positive score
-    floatingTextDepth: 360, // depth for floating text (above animated actors)
+    floatingTextDepth: 10000, // depth for floating text (above all UI elements including section borders at 9999)
+  },
+
+  /**
+   * Wave-vendor collision configuration
+   * Risk/reward mechanics when waves hit vendors
+   */
+  waveCollision: {
+    sectionAttentionPenalty: 15, // Section-wide attention penalty
+    localHappinessPenalty: 10, // Local happiness penalty (within radius)
+    localRadius: 2, // Cell radius for local penalties
+    splatChancePerPoint: 0.05, // 5% chance per point earned (max 50%)
+    splatCooldownPenalty: 5000, // Extra cooldown (ms) on splat
+    seatRowMin: 14, // Min row for collision detection (seat zone)
+    seatRowMax: 17, // Max row for collision detection (seat zone)
+    columnTolerance: 0, // Exact column match required (±0)
+    rowTolerance: 1, // Allow vendors within ±1 row of seats
   },
 };
 

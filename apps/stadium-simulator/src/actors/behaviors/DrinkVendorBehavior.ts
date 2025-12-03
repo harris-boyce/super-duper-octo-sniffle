@@ -470,7 +470,13 @@ export class DrinkVendorBehavior implements AIActorBehavior {
       // Transition to serving
       this.state = 'serving' as AIActorState;
       this.serviceTimer = this.config.serviceTime;
-      console.log('[DrinkVendorBehavior] Arrived at fan, starting service (duration:', this.config.serviceTime, 'ms)');
+      
+      const vendorPos = this.vendorActor.getGridPosition();
+      const fanPos = this.targetFanActor.getGridPosition();
+      console.log('[DrinkVendorBehavior] 🎯 Arrived at fan for service!');
+      console.log(`[DrinkVendorBehavior]   Vendor position: (${vendorPos.row},${vendorPos.col})`);
+      console.log(`[DrinkVendorBehavior]   Fan position: (${fanPos.row},${fanPos.col})`);
+      console.log(`[DrinkVendorBehavior]   Service duration: ${this.config.serviceTime}ms`);
       
       // Emit event for UI feedback (optional)
       // this.vendorActor.emit('serviceStarted', { fanPosition: this.targetFanActor.getPosition() });
@@ -558,10 +564,11 @@ export class DrinkVendorBehavior implements AIActorBehavior {
     
     const vendorSprite = this.vendorActor.getVendor();
     const scene = vendorSprite.scene;
-    const vendorId = (this.vendorActor as any).id;
+    const actorId = (this.vendorActor as any).id; // String like 'actor:vendor-0'
     
+    console.log('[DrinkVendorBehavior] Emitting vendorDropoff event for actor:', actorId);
     // Emit dropoff event with points earned via AIManager
-    this.aiManager.notifyVendorDropoff(vendorId, this.pointsEarned);
+    this.aiManager.notifyVendorDropoff(actorId, this.pointsEarned);
     
     // Phase 1: Fade out + scale down (2s)
     scene.tweens.add({

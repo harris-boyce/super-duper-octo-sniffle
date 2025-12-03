@@ -33,41 +33,73 @@ export class DrinkVendorActor extends VendorActor {
     const hasPath = this.hasPath();
     const pathLength = hasPath ? this.getPath().length : 0;
     const pathIndex = hasPath ? this.getCurrentSegmentIndex() : -1;
-    
+
     // Log state occasionally (every 60 frames ~= 1 second)
     if (Math.random() < 0.017) {
       console.log('[DrinkVendorActor] State:', behaviorState, '| hasPath:', hasPath, '| path:', pathLength, 'cells | index:', pathIndex);
     }
-    
+
     // Update behavior state machine first
     this.behavior.tick(delta);
-    
-    // Update movement (if path active)
-    if (this.hasPath() && !this.isAtPathEnd()) {
+
+    if (hasPath) {
       this.updateMovement(delta);
-      // Check if we just reached the end after movement
-      if (this.isAtPathEnd()) {
-        // Only trigger arrival if on the correct drop zone cell (if dropping off)
-        const behaviorState = this.behavior.getState();
-        if (behaviorState === 'droppingOff' && typeof this.behavior.getCurrentDropZone === 'function') {
-          const dropZone = this.behavior.getCurrentDropZone();
-          const pos = this.getGridPosition();
-          if (dropZone && pos.row === dropZone.row && pos.col === dropZone.col) {
-            console.log('[DrinkVendorActor] ✓ Reached drop zone cell, calling onArrival()');
-            this.behavior.onArrival();
-            this.clearPath();
-          } else {
-            console.warn('[DrinkVendorActor] At path end but not on drop zone cell:', pos, 'expected:', dropZone);
-            // Optionally: retry pathfinding or halt
-          }
-        } else {
-          // Not dropping off, normal arrival
-          console.log('[DrinkVendorActor] ✓ Reached end of path, calling onArrival()');
-          this.behavior.onArrival();
-          this.clearPath();
-        }
+
+      if (this.hasReachedFinalWaypoint()) {
+        this.handleArrival();
       }
     }
+  }
+
+  /**
+   * Determines whether the actor has physically reached the final waypoint.
+   * Needed because isAtPathEnd flips to true as soon as the final index is targeted,
+   * which can happen before the sprite visually occupies that cell.
+   */
+  private hasReachedFinalWaypoint(): boolean {
+    if (!this.hasPath()) return false;
+    if (!this.isAtPathEnd()) return false;
+
+    const path = this.getPath();
+    if (!path || path.length === 0) return false;
+
+    const target = path[path.length - 1];
+    const { x, y } = this.getPosition();
+    const dx = target.x - x;
+    const dy = target.y - y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    // Require sprite to be essentially on top of the waypoint (<= 2px tolerance)
+    return distance <= 2;
+  }
+
+  /**
+   * Invokes appropriate arrival logic depending on current behavior state.
+   */
+  private handleArrival(): void {
+    const behaviorState = this.behavior.getState();
+    if (behaviorState === 'droppingOff' && typeof this.behavior.getCurrentDropZone === 'function') {
+      const dropZone = this.behavior.getCurrentDropZone();
+      const pos = this.getGridPosition();
+      
+      // Allow 1-cell tolerance for drop zone arrival (vendor might stop slightly short)
+      const rowDiff = Math.abs(pos.row - (dropZone?.row ?? -999));
+      const colDiff = Math.abs(pos.col - (dropZone?.col ?? -999));
+      const withinTolerance = rowDiff <= 1 && colDiff <= 1;
+      
+      if (dropZone && withinTolerance) {
+        console.log('[DrinkVendorActor] ✓ Reached drop zone (tolerance), pos:', pos, 'target:', dropZone, 'calling onArrival()');
+        this.behavior.onArrival();
+        this.clearPath();
+      } else {
+        console.warn('[DrinkVendorActor] At path end but NOT near drop zone:', pos, 'expected:', dropZone, 'rowDiff:', rowDiff, 'colDiff:', colDiff);
+      }
+      return;
+    }
+
+    console.log('[DrinkVendorActor] ✓ Reached end of path, calling onArrival()');
+    this.behavior.onArrival();
+    this.clearPath();
   }
 
   /**

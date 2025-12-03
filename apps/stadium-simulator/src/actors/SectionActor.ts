@@ -27,18 +27,21 @@ export class SectionActor extends SceneryActor {
   private happinessAgg: number = 0;
   private thirstAgg: number = 0;
   private attentionAgg: number = 0;
+  private actorRegistry?: any;
 
   constructor(
     id: string,
     scene: Phaser.Scene,
     sectionData: any, // Should be SectionData
     gridManager?: any,
+    actorRegistry?: any,
     category: ActorCategory = 'section',
     enableLogging = false
   ) {
     super(id, 'section', category, sectionData.gridTop, sectionData.gridLeft, enableLogging);
     this.sectionId = sectionData.id;
     this.gridManager = gridManager;
+    this.actorRegistry = actorRegistry;
     this.sectionData = sectionData;
     // Calculate world position from grid boundaries
     // Section has 5 grid rows but only 4 visual seat rows (row 18 is corridor base)
@@ -122,7 +125,8 @@ export class SectionActor extends SceneryActor {
         lightnessStops: { current: targetLightness, next: nextRowLightness },
         container: this.section,
         scene: this.section.scene,
-        gridManager: this.gridManager
+        gridManager: this.gridManager,
+        actorRegistry: this.actorRegistry
       });
 
       rowActor.buildSeats(seatsPerRow);
@@ -162,6 +166,10 @@ export class SectionActor extends SceneryActor {
           );
           // Set the FanActor's grid position to absolute grid coordinates
           fanActor.setGridPosition(fd.gridRow, fd.gridCol, this.gridManager);
+          // Register fan with ActorRegistry
+          if (this.actorRegistry) {
+            this.actorRegistry.register(fanActor);
+          }
           seat.setFan(fan);
           this.fans.set(`${fd.row}-${fd.col}`, fan);
           this.fanActors.set(`${fd.row}-${fd.col}`, fanActor);

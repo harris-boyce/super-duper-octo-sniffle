@@ -181,6 +181,7 @@ export class StadiumScene extends Phaser.Scene {
         this,
         sectionData,
         this.gridManager,
+        this.actorRegistry,
         'section',
         false
       );
@@ -614,9 +615,16 @@ export class StadiumScene extends Phaser.Scene {
       this.updateWaveStrengthMeter(data.strength);
     });
 
+    // Listen to vendor collisions (Phase 3.1)
+    this.waveManager.on('vendorCollision', (data: { actorId: string; sectionId: string; pointsAtRisk: number; vendorPosition: { row: number; col: number }; waveColumn: number }) => {
+      console.log(`[StadiumScene.vendorCollision] 💥 Vendor ${data.actorId} hit in section ${data.sectionId}! Points at risk: ${data.pointsAtRisk}`);
+      // TODO Phase 3.2: Apply collision penalties via SectionActor
+      // TODO Phase 3.3: Roll for splat and apply consequences
+    });
+
     // Grid-column-based wave participation (triggered as wave moves through grid)
     this.waveManager.on('columnWaveReached', (data: { sectionId: string; gridCol: number; worldX: number; seatIds: string[]; seatCount: number; waveStrength?: number; visualState?: string }) => {
-      console.log(`[StadiumScene.columnWaveReached] Section ${data.sectionId}, gridCol ${data.gridCol}, ${data.seatIds.length} seats`);
+      // console.log(`[StadiumScene.columnWaveReached] Section ${data.sectionId}, gridCol ${data.gridCol}, ${data.seatIds.length} seats`);
       
       const sectionIndex = this.getSectionIndex(data.sectionId);
       const section = this.sections[sectionIndex];
@@ -1546,14 +1554,14 @@ export class StadiumScene extends Phaser.Scene {
     });
 
     // Vendor dropoff event (scoring)
-    this.aiManager.on('vendorDropoff', (data: { vendorId: number; pointsEarned: number }) => {
-      console.log(`[Vendor] Vendor ${data.vendorId} dropped off ${data.pointsEarned} points`);
+    this.aiManager.on('vendorDropoff', (data: { actorId: string; pointsEarned: number }) => {
+      console.log(`[Vendor] Vendor ${data.actorId} dropped off ${data.pointsEarned} points`);
       
       // Add score to GameStateManager
       this.gameState.addVendorScore(data.pointsEarned);
       
-      // Find nearest drop zone to vendor
-      const vendorActor = this.aiManager.getVendorActor(data.vendorId);
+      // Find vendor actor via registry
+      const vendorActor = this.actorRegistry.get(data.actorId) as VendorActor;
       if (vendorActor) {
         const vendorPos = vendorActor.getGridPosition();
         let nearestDropZone: DropZoneActor | null = null;
