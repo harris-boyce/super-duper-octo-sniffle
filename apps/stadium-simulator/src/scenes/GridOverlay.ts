@@ -118,35 +118,35 @@ export class GridOverlay extends Phaser.GameObjects.Graphics {
     if (!this.visible) return; // Only toggle if grid is visible
     this.showNodes = !this.showNodes;
     this.needsRedraw = true;
-    console.log(`[GridOverlay] Navigation nodes: ${this.showNodes ? 'ON' : 'OFF'}`);
+    // console.log(`[GridOverlay] Navigation nodes: ${this.showNodes ? 'ON' : 'OFF'}`);
   }
 
   public toggleVendorPaths(): void {
     if (!this.visible) return; // Only toggle if grid is visible
     this.showVendorPaths = !this.showVendorPaths;
     this.needsRedraw = true;
-    console.log(`[GridOverlay] Paths: ${this.showVendorPaths ? 'ON' : 'OFF'}`);
+    // console.log(`[GridOverlay] Paths: ${this.showVendorPaths ? 'ON' : 'OFF'}`);
   }
 
   public toggleZones(): void {
     if (!this.visible) return;
     this.showZones = !this.showZones;
     this.needsRedraw = true;
-    console.log(`[GridOverlay] Zone visualization: ${this.showZones ? 'ON' : 'OFF'}`);
+    // console.log(`[GridOverlay] Zone visualization: ${this.showZones ? 'ON' : 'OFF'}`);
   }
 
   public toggleTransitions(): void {
     if (!this.visible) return;
     this.showTransitions = !this.showTransitions;
     this.needsRedraw = true;
-    console.log(`[GridOverlay] Transition markers: ${this.showTransitions ? 'ON' : 'OFF'}`);
+    // console.log(`[GridOverlay] Transition markers: ${this.showTransitions ? 'ON' : 'OFF'}`);
   }
 
   public toggleDirectionalEdges(): void {
     if (!this.visible) return;
     this.showDirectionalEdges = !this.showDirectionalEdges;
     this.needsRedraw = true;
-    console.log(`[GridOverlay] Directional edges: ${this.showDirectionalEdges ? 'ON' : 'OFF'}`);
+    // console.log(`[GridOverlay] Directional edges: ${this.showDirectionalEdges ? 'ON' : 'OFF'}`);
   }
 
   private setBackgroundVisible(visible: boolean): void {
@@ -200,7 +200,7 @@ export class GridOverlay extends Phaser.GameObjects.Graphics {
     const { cellSize } = this.grid.getWorldSize();
     const origin = this.grid.getOrigin();
 
-    console.log(`[GridOverlay.redraw] Clearing and redrawing. Visible: ${this.visible}, Depth: ${this.depth}, Alpha: ${this.alpha}`);
+    // console.log(`[GridOverlay.redraw] Clearing and redrawing. Visible: ${this.visible}, Depth: ${this.depth}, Alpha: ${this.alpha}`);
 
     this.clear();
 
@@ -232,7 +232,7 @@ export class GridOverlay extends Phaser.GameObjects.Graphics {
 
     // Render vendor paths if enabled
     if (this.showVendorPaths) {
-      console.log('[GridOverlay.redraw] Rendering recent paths...');
+      // console.log('[GridOverlay.redraw] Rendering recent paths...');
       this.renderRecentPaths();
     }
     // Update persistent cursor text with current grid position
@@ -246,7 +246,7 @@ export class GridOverlay extends Phaser.GameObjects.Graphics {
       }
     }
     
-    console.log('[GridOverlay.redraw] Redraw complete');
+    // console.log('[GridOverlay.redraw] Redraw complete');
   }
   /**
    * Update pointer position and grid cell
@@ -392,15 +392,15 @@ export class GridOverlay extends Phaser.GameObjects.Graphics {
 
         // Debug logging for sky cells at edges
         if (cell.zoneType === 'sky' && (cell.col === 0 || cell.col === 1 || cell.col === 30 || cell.col === 31) && cell.row === 0 && key === 'top') {
-          console.log(`[GridOverlay] Sky cell (${cell.row},${cell.col}) ${key}: outgoing=${outgoing} incoming=${incoming}`);
-          console.log(`[GridOverlay] cell.allowedOutgoing:`, cell.allowedOutgoing);
+          // console.log(`[GridOverlay] Sky cell (${cell.row},${cell.col}) ${key}: outgoing=${outgoing} incoming=${incoming}`);
+          // console.log(`[GridOverlay] cell.allowedOutgoing:`, cell.allowedOutgoing);
         }
 
         if (!outgoing && !incoming) return; // Skip if both blocked
 
         // Debug: Log any cell at cols 0,1,30,31 that's drawing arrows
         if ((cell.col === 0 || cell.col === 1 || cell.col === 30 || cell.col === 31) && cell.row <= 14) {
-          console.log(`[GridOverlay] Drawing arrow for cell (${cell.row},${cell.col}) zone=${cell.zoneType} ${key}: out=${outgoing} in=${incoming}`);
+          // console.log(`[GridOverlay] Drawing arrow for cell (${cell.row},${cell.col}) zone=${cell.zoneType} ${key}: out=${outgoing} in=${incoming}`);
         }
 
         const endX = centerX + dx * arrowLength;
@@ -477,7 +477,7 @@ export class GridOverlay extends Phaser.GameObjects.Graphics {
       this.fillCircle(end.x, end.y, 7);
       rendered++;
     });
-    console.log(`[GridOverlay] Rendered ${rendered} recent paths (history size=${this.pathHistory.length})`);
+    // console.log(`[GridOverlay] Rendered ${rendered} recent paths (history size=${this.pathHistory.length})`);
   }
 }
 

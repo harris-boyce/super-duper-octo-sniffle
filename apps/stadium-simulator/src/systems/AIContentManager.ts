@@ -98,7 +98,7 @@ export class AIContentManager {
         // Initialize IndexedDB
         await this.initializeDatabase();
       } catch (error) {
-        console.warn('Failed to initialize IndexedDB, will use fallback only:', error);
+        // console.warn('Failed to initialize IndexedDB, will use fallback only:', error);
       }
 
       // Load fallback content
@@ -127,7 +127,7 @@ export class AIContentManager {
         },
       });
     } catch (error) {
-      console.error('Failed to open IndexedDB:', error);
+      // console.error('Failed to open IndexedDB:', error);
       throw error;
     }
   }
@@ -143,7 +143,7 @@ export class AIContentManager {
       }
       this.fallbackContent = await response.json();
     } catch (error) {
-      console.error('Failed to load fallback content:', error);
+      // console.error('Failed to load fallback content:', error);
       // Create minimal fallback if static file fails to load
       this.fallbackContent = this.createMinimalFallback();
     }
@@ -278,7 +278,7 @@ export class AIContentManager {
 
       return entry.content;
     } catch (error) {
-      console.error('Failed to retrieve cached content:', error);
+      // console.error('Failed to retrieve cached content:', error);
       return null;
     }
   }
@@ -322,7 +322,7 @@ export class AIContentManager {
     await this.initialize();
 
     if (!this.db) {
-      console.warn('Cannot store content: IndexedDB not available');
+      // console.warn('Cannot store content: IndexedDB not available');
       return;
     }
 
@@ -339,7 +339,7 @@ export class AIContentManager {
     try {
       await this.db.put(STORE_CONTENT_EPOCHS, entry, cacheKey);
     } catch (error) {
-      console.error('Failed to store content in cache:', error);
+      // console.error('Failed to store content in cache:', error);
       // Non-fatal: just log the error
     }
   }
@@ -360,7 +360,7 @@ export class AIContentManager {
     try {
       return await this.db.get(STORE_METADATA, contentId) || null;
     } catch (error) {
-      console.error('Failed to retrieve metadata:', error);
+      // console.error('Failed to retrieve metadata:', error);
       return null;
     }
   }
@@ -376,14 +376,14 @@ export class AIContentManager {
     await this.initialize();
 
     if (!this.db) {
-      console.warn('Cannot store metadata: IndexedDB not available');
+      // console.warn('Cannot store metadata: IndexedDB not available');
       return;
     }
 
     try {
       await this.db.put(STORE_METADATA, metadata, contentId);
     } catch (error) {
-      console.error('Failed to store metadata:', error);
+      // console.error('Failed to store metadata:', error);
     }
   }
 
@@ -403,7 +403,7 @@ export class AIContentManager {
       await this.db.clear(STORE_CONTENT_EPOCHS);
       await this.db.clear(STORE_METADATA);
     } catch (error) {
-      console.error('Failed to clear cache:', error);
+      // console.error('Failed to clear cache:', error);
     }
   }
 
@@ -437,7 +437,7 @@ export class AIContentManager {
       const entry = await this.db.get(STORE_CONTENT_EPOCHS, cacheKey);
       return entry !== undefined && entry.expiresAt > Date.now();
     } catch (error) {
-      console.error('Failed to check content existence:', error);
+      // console.error('Failed to check content existence:', error);
       return false;
     }
   }

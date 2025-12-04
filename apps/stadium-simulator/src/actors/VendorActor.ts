@@ -1,5 +1,6 @@
 import { AnimatedActor } from '@/actors/base/Actor';
 import { Vendor } from '@/sprites/Vendor';
+import { gameBalance } from '@/config/gameBalance';
 import PersonalityIntegrationManager from '@/systems/PersonalityIntegrationManager';
 import type { GridManager } from '@/managers/GridManager';
 import type { ActorCategory } from '@/actors/interfaces/ActorTypes';
@@ -12,6 +13,7 @@ import type { GridPathCell } from '@/managers/interfaces/VendorTypes';
  * Creates and manages its own Vendor sprite internally.
  */
 export class VendorActor extends AnimatedActor {
+  private isFalling: boolean = false;
   protected vendor: Vendor;
   protected personality: any;
   protected position: { x: number; y: number };
@@ -56,12 +58,12 @@ export class VendorActor extends AnimatedActor {
         this.gridCol = gridPos.col;
         const depth = this.gridManager.getDepthForPosition(gridPos.row, gridPos.col);
         this.vendor.setDepth(depth);
-        console.log(`[VendorActor] Init depth for vendor at grid (${gridPos.row},${gridPos.col}): ${depth}`);
+        if (gameBalance.debug.vendorActorLogs) console.log(`[VendorActor] Init depth for vendor at grid (${gridPos.row},${gridPos.col}): ${depth}`);
       } else {
         const fallbackDepth = this.gridManager.getDepthForWorld(x, y);
         if (typeof fallbackDepth === 'number') {
           this.vendor.setDepth(fallbackDepth);
-          console.log(`[VendorActor] Init fallback depth: ${fallbackDepth}`);
+          if (gameBalance.debug.vendorActorLogs) console.log(`[VendorActor] Init fallback depth: ${fallbackDepth}`);
         }
       }
     }
@@ -143,18 +145,25 @@ export class VendorActor extends AnimatedActor {
    * @param deltaTime Time elapsed since last update (ms)
    */
   public updateMovement(deltaTime: number): void {
+    if (this.isFalling) return; // Prevent movement during fall animation
     const path = this.currentPath;
     if (!path || path.length === 0) return;
-
     const currentSegment = path[this.currentPathIndex];
-    if (!currentSegment) {
-      console.warn('[VendorActor] Current segment is null at index', this.currentPathIndex, 'path length:', path.length);
-      return;
+    if (!currentSegment) return;
+    let targetX = currentSegment.x;
+    let targetY = currentSegment.y;
+    
+    // Vendor sprite is 20px wide, so offset by 8px in movement direction
+    // This ensures 75% of the sprite bounding box is in the target cell
+    const isLastWaypoint = this.currentPathIndex >= path.length - 1;
+    if (isLastWaypoint) {
+      const prevSegment = path[Math.max(0, this.currentPathIndex - 1)];
+      const dirX = Math.sign(targetX - prevSegment.x);
+      const dirY = Math.sign(targetY - prevSegment.y);
+      targetX += dirX * 8; // 8px offset = 75% into cell for 32px cells
+      targetY += dirY * 8;
     }
-
-    // Move toward current waypoint
-    const targetX = currentSegment.x;
-    const targetY = currentSegment.y;
+    
     const dx = targetX - this.position.x;
     const dy = targetY - this.position.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
@@ -163,25 +172,37 @@ export class VendorActor extends AnimatedActor {
     const speed = 64; // pixels per second
     const moveDistance = (speed * deltaTime) / 1000;
 
-    if (distance <= moveDistance) {
-      // Reached current waypoint - snap to it and advance
+    // Always snap if within moveDistance OR if distance is small (< 3px to avoid Zeno's paradox)
+    if (distance <= moveDistance || distance < 3.0) {
       this.position.x = targetX;
       this.position.y = targetY;
       this.vendor.setPosition(targetX, targetY);
       this.updateDepthForPosition(targetX, targetY);
-      
-      const wasLastSegment = this.currentPathIndex >= path.length - 1;
-      const advanced = this.advanceSegment();
-      
-      if (!advanced) {
-        // Reached the final waypoint
-        console.log('[VendorActor] Reached final waypoint at', this.currentPathIndex);
-      }
+      this.advanceSegment();
+      return;
+    }
+
+    // Calculate new position
+    const ratio = Math.min(moveDistance / distance, 1.0);
+    const newX = this.position.x + dx * ratio;
+    const newY = this.position.y + dy * ratio;
+    
+    // Calculate distance from new position to target
+    const newDx = targetX - newX;
+    const newDy = targetY - newY;
+    const newDistance = Math.sqrt(newDx * newDx + newDy * newDy);
+    
+    // If moving would increase distance OR new position is very close, snap to target
+    if (newDistance >= distance || newDistance < 1.0) {
+      this.position.x = targetX;
+      this.position.y = targetY;
+      this.vendor.setPosition(targetX, targetY);
+      this.updateDepthForPosition(targetX, targetY);
+      this.advanceSegment();
     } else {
-      // Move toward waypoint
-      const ratio = moveDistance / distance;
-      this.position.x += dx * ratio;
-      this.position.y += dy * ratio;
+      // Safe to move
+      this.position.x = newX;
+      this.position.y = newY;
       this.vendor.setPosition(this.position.x, this.position.y);
       this.updateDepthForPosition(this.position.x, this.position.y);
     }
@@ -218,12 +239,77 @@ export class VendorActor extends AnimatedActor {
   }
 
   /**
+   * Move vendor to new position (world coordinates)
+   * Updates both actor position and sprite
+   * @param x World X coordinate
+   * @param y World Y coordinate
+   */
+  public moveToPosition(x: number, y: number): void {
+    this.position.x = x;
+    this.position.y = y;
+    this.vendor.setPosition(x, y);
+    
+    // Update grid position
+    if (this.gridManager) {
+      const gridPos = this.gridManager.worldToGrid(x, y);
+      if (gridPos) {
+        this.gridRow = gridPos.row;
+        this.gridCol = gridPos.col;
+        // Update depth for new position
+        const depth = this.gridManager.getDepthForPosition(gridPos.row, gridPos.col);
+        this.vendor.setDepth(depth);
+      }
+    }
+  }
+
+  /**
+   * Update grid position only (without moving sprite)
+   * Used when sprite is animating and we need to update logical grid coordinates
+   * Assumes sprite is already at the target world position
+   * @param gridRow Grid row
+   * @param gridCol Grid column
+   */
+  public updateGridPosition(gridRow: number, gridCol: number): void {
+    this.gridRow = gridRow;
+    this.gridCol = gridCol;
+    
+    // Update depth for new position
+    if (this.gridManager) {
+      const depth = this.gridManager.getDepthForPosition(gridRow, gridCol);
+      this.vendor.setDepth(depth);
+    }
+  }
+
+  /**
+   * Complete splat animation by syncing grid and position after sprite animation
+   * Called after splat tween completes to finalize actor state
+   * @param gridRow Target grid row
+   * @param gridCol Target grid column
+   */
+  public completeSplatAnimation(gridRow: number, gridCol: number): void {
+    this.gridRow = gridRow;
+    this.gridCol = gridCol;
+    
+    // Sync actor position with sprite's current position (where tween left it)
+    this.position.x = this.vendor.x;
+    this.position.y = this.vendor.y;
+    
+    // Update depth for new position
+    if (this.gridManager) {
+      const depth = this.gridManager.getDepthForPosition(gridRow, gridCol);
+      this.vendor.setDepth(depth);
+    }
+  }
+
+  /**
    * Update vendor actor (called each frame)
    * Override in subclasses to add behavior
+   * @param delta - Time elapsed in milliseconds
+   * @param roundTime - Time relative to round start (negative = remaining, positive = elapsed)
    */
-  public update(delta: number): void {
+  public update(delta: number, roundTime: number): void {
     // Base implementation does nothing
-    // Subclasses override to delegate to behavior.tick()
+    // Subclasses override to delegate to behavior.tick(delta, roundTime)
   }
 
   /**
@@ -247,12 +333,110 @@ export class VendorActor extends AnimatedActor {
       this.vendor.setDepth(depth);
       // Debug log occasionally
       if (Math.random() < 0.01) {
-        console.log(`[VendorActor] Update depth at grid (${coords.row},${coords.col}): ${depth} (base: ${baseDepth}), actual depth: ${this.vendor.depth}`);
+        if (gameBalance.debug.vendorActorLogs) console.log(`[VendorActor] Update depth at grid (${coords.row},${coords.col}): ${depth} (base: ${baseDepth}), actual depth: ${this.vendor.depth}`);
       }
     } else {
       const depth = this.gridManager.getDepthForWorld(x, y);
       if (typeof depth === 'number') this.vendor.setDepth(depth + 2);
     }
+  }
+
+  /**
+   * Generate a vertical fall path from current grid cell to nearest ground cell in the same column.
+   * Ignores normal passability rules.
+   */
+  public generateFallPathToGround(): Array<{ row: number; col: number }> {
+    if (!this.gridManager) return [];
+    const coords = this.gridManager.worldToGrid(this.position.x, this.position.y);
+    if (!coords) return [];
+    const { row, col } = coords;
+    const path: Array<{ row: number; col: number }> = [];
+    // Start at current row, go down to bottom row
+    for (let r = row; r < this.gridManager.getRowCount(); r++) {
+      path.push({ row: r, col });
+      // Stop at first ground cell
+      const cell = this.gridManager.getCell(r, col);
+      if (cell && cell.zoneType === 'ground') break;
+    }
+    return path;
+  }
+
+  /**
+   * Animate the vendor sprite/container along the fall path.
+   * Disables normal movement logic during animation.
+   */
+  public async animateFallAlongPath(path: Array<{ row: number; col: number }>): Promise<void> {
+    if (!path || path.length === 0 || !this.gridManager) return;
+    this.isFalling = true;
+    
+    const totalDuration = path.length * 120; // Total fall time based on path length
+    const startRotation = this.vendor.rotation;
+    const startScale = this.vendor.scale;
+    
+    // Start rotation animation (720° + 90° over total duration)
+    this.vendor.scene.tweens.add({
+      targets: this.vendor,
+      rotation: startRotation + Math.PI * 4 + Math.PI / 2, // 720° + 90°
+      duration: totalDuration,
+      ease: 'Cubic.easeOut'
+    });
+    
+    // Start scale animation (1.0 → 0.8 → 1.2 → 1.0)
+    this.vendor.scene.tweens.add({
+      targets: this.vendor,
+      scale: startScale * 0.8,
+      duration: totalDuration * 0.25,
+      ease: 'Sine.easeInOut',
+      onComplete: () => {
+        this.vendor.scene.tweens.add({
+          targets: this.vendor,
+          scale: startScale * 1.2,
+          duration: totalDuration * 0.25,
+          ease: 'Sine.easeInOut',
+          onComplete: () => {
+            this.vendor.scene.tweens.add({
+              targets: this.vendor,
+              scale: startScale,
+              duration: totalDuration * 0.5,
+              ease: 'Sine.easeInOut'
+            });
+          }
+        });
+      }
+    });
+    
+    // Animate through each cell in the path
+    for (let i = 0; i < path.length; i++) {
+      const { row, col } = path[i];
+      const { x, y } = this.gridManager.gridToWorld(row, col);
+      await new Promise<void>(resolve => {
+        this.vendor.scene.tweens.add({
+          targets: this.vendor,
+          x,
+          y,
+          duration: 120, // fast drop per cell
+          ease: 'Linear',
+          onUpdate: () => {
+            // Update actor position to match sprite
+            this.position.x = this.vendor.x;
+            this.position.y = this.vendor.y;
+          },
+          onComplete: () => resolve()
+        });
+      });
+    }
+    
+    // Update grid position to final cell
+    const finalCell = path[path.length - 1];
+    this.gridRow = finalCell.row;
+    this.gridCol = finalCell.col;
+    
+    // Play bounce animation on top/bottom sprites
+    if (typeof this.vendor.playBounceAnimation === 'function') {
+      this.vendor.playBounceAnimation();
+    }
+    
+    this.isFalling = false;
   }
 
   /**

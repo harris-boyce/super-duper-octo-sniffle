@@ -18,6 +18,27 @@ import { CatchParticles } from '@/components/CatchParticles';
  * - playWave(delay, intensity) to perform the quick up/down motion with variable intensity
  */
 export class Fan extends BaseActorContainer {
+      /**
+       * Blink a red border around the fan to indicate a collision penalty
+       */
+      public blinkBorderRed(durationMs: number = 500): void {
+        // Draw a rectangle slightly larger than the fan body
+        const borderSize = Math.max(this.size, this.size * 1.3);
+        const border = this.scene.add.rectangle(0, -Math.round(this.size * 1.3 / 2), borderSize, borderSize, 0xff0000)
+          .setOrigin(0.5, 0.5)
+          .setStrokeStyle(3, 0xff0000, 1)
+          .setAlpha(1);
+        this.add(border);
+        // Animate alpha to 0, then destroy
+        this.scene.tweens.add({
+          targets: border,
+          alpha: 0,
+          duration: durationMs,
+          onComplete: () => {
+            border.destroy();
+          }
+        });
+      }
     private _originalX: number;
     private _originalY: number;
   private top: Phaser.GameObjects.Rectangle;
@@ -67,6 +88,64 @@ export class Fan extends BaseActorContainer {
     const r3 = Math.random();
     const bellCurve = (r1 + r2 + r3) / 3;
     this._thirstMultiplier = 0.5 + bellCurve;
+  }
+
+  /**
+   * Play excited jump and jitter animation (t-shirt cannon reaction)
+   * @param intensity Bounce intensity (1.0 = epicenter, 0.33 = edge) - creates mini wave effect
+   */
+  public playExcitedJump(intensity: number = 1.0): void {
+    const originalY = this.y;
+    const originalX = this.x;
+    
+    // Scale bounce parameters by intensity for distance-based falloff
+    const jumpHeight = 32 * intensity; // 48px at max intensity (1.5), 16px at edge - extreme for visibility
+    const jitterAmount = 8 * intensity; // 12px at max intensity, 4px at edge
+    
+    // Multiple bounces for more visible reaction
+    this.scene.tweens.add({
+      targets: this,
+      y: originalY - jumpHeight,
+      duration: 150,
+      ease: 'Sine.easeInOut',
+      yoyo: true,
+      repeat: 1, // Bounce twice (up-down-up-down)
+      onComplete: () => {
+        this.y = originalY; // Ensure exact reset
+      }
+    });
+    
+    // Simultaneous jitter for more energetic feel
+    this.scene.tweens.add({
+      targets: this,
+      x: originalX + jitterAmount,
+      duration: 60,
+      ease: 'Sine.easeInOut',
+      yoyo: true,
+      repeat: 3, // Jitter 4 times total
+      onComplete: () => {
+        this.x = originalX; // Ensure exact reset
+      }
+    });
+    
+    // Random rotational wobble (each fan wobbles differently)
+    const wobbleAmount = (Math.random() * 10 - 5) * intensity; // -5 to +5 degrees scaled by intensity
+    const wobbleDuration = 80 + Math.random() * 40; // 80-120ms random duration
+    const wobbleDelay = Math.random() * 30; // 0-30ms random start delay
+    
+    this.scene.time.delayedCall(wobbleDelay, () => {
+      this.scene.tweens.add({
+        targets: this,
+        angle: wobbleAmount,
+        duration: wobbleDuration,
+        ease: 'Sine.easeInOut',
+        yoyo: true,
+        repeat: 1, // Wobble twice
+        onComplete: () => {
+          this.angle = 0; // Ensure exact reset
+        }
+      });
+    });
   }
 
   // NOTE: All stat/gameplay logic removed. Sprite remains purely visual.
@@ -314,7 +393,7 @@ export class Fan extends BaseActorContainer {
         return Promise.resolve();
       
       default:
-        console.warn(`Unknown animation '${animationName}' for Fan`);
+        // console.warn(`Unknown animation '${animationName}' for Fan`);
         return Promise.resolve();
     }
   }

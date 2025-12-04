@@ -140,7 +140,7 @@ export class AIManager {
    */
   public attachPathfindingService(service: PathfindingService): void {
     this.pathfindingService = service;
-    console.log('[AIManager] PathfindingService attached');
+    if (gameBalance.debug.aiManagerLogs) console.log('[AIManager] PathfindingService attached');
   }
 
   /**
@@ -240,7 +240,7 @@ export class AIManager {
     this.actorRegistry?.register(vendorActor);
     this.vendorActors.set(profile.id, vendorActor);
     
-    console.log(`[AIManager] Spawned vendor ${profile.id} as actor ${actorId}`);
+    if (gameBalance.debug.aiManagerLogs) console.log(`[AIManager] Spawned vendor ${profile.id} as actor ${actorId}`);
     
     return { actor: vendorActor, id: profile.id };
   }
@@ -282,26 +282,26 @@ export class AIManager {
     // Check if vendor actor exists in new system
     const vendorActor = this.vendorActors.get(vendorId);
     if (!vendorActor) {
-      console.warn(`[AIManager] Cannot assign unknown vendor ${vendorId}`);
+      // console.warn(`[AIManager] Cannot assign unknown vendor ${vendorId}`);
       return;
     }
     
     if (sectionIdx < 0 || sectionIdx >= this.sectionActors.length) {
-      console.warn(`[AIManager] Invalid section index ${sectionIdx}`);
+      // console.warn(`[AIManager] Invalid section index ${sectionIdx}`);
       return;
     }
     
     // Delegate to behavior
     const behavior = vendorActor.getBehavior() as DrinkVendorBehavior;
     if (!behavior || !('assignToSection' in behavior)) {
-      console.warn(`[AIManager] Vendor ${vendorId} behavior missing assignToSection method`);
+      // console.warn(`[AIManager] Vendor ${vendorId} behavior missing assignToSection method`);
       return;
     }
     
     // Delegate assignment to behavior with target seat coordinates
     behavior.assignToSection(sectionIdx, seatRow, seatCol);
     
-    console.log(`[AIManager] Vendor ${vendorId} assigned to section ${sectionIdx}${seatRow !== undefined ? ` at seat (${seatRow},${seatCol})` : ''}`);
+    if (gameBalance.debug.aiManagerLogs) console.log(`[AIManager] Vendor ${vendorId} assigned to section ${sectionIdx}${seatRow !== undefined ? ` at seat (${seatRow},${seatCol})` : ''}`);
     this.emit('vendorAssigned', { vendorId, sectionIdx });
   }
   
@@ -357,7 +357,7 @@ export class AIManager {
   public serveFan(vendorId: number, fan: Fan): void {
     // Service is now handled directly by behaviors
     // This stub remains for backward compatibility
-    console.log(`[AIManager] serveFan called (deprecated) - service handled by behavior`);
+    if (gameBalance.debug.aiManagerLogs) console.log(`[AIManager] serveFan called (deprecated) - service handled by behavior`);
   }
 
   /**
@@ -418,23 +418,28 @@ export class AIManager {
    * Handles category-ordered updates: scenery → utility → fans → vendors → mascots
    * Then performs cross-actor orchestration logic
    * @param deltaTime - Time elapsed in milliseconds
+   * @param roundTime - Time relative to round start (negative = remaining, positive = elapsed)
    * @param scene - Phaser scene (passed to actors for time.now access)
    */
-  public update(deltaTime: number, scene?: Phaser.Scene): void {
+  public update(deltaTime: number, roundTime: number, scene?: Phaser.Scene): void {
+    // 0. Coordinate cluster decay across sections (GameStateManager determines which sections decay)
+    const sessionTime = Date.now() - (this.gameState as any).sessionStartTime;
+    this.gameState.updateClusterDecay(deltaTime, sessionTime, this.actorRegistry);
+
     // 1. Scenery (SectionActor updates all fans + aggregates)
-    this.updateSceneryActors(deltaTime, scene);
+    this.updateSceneryActors(deltaTime, roundTime, scene);
 
     // 2. Utility actors (e.g., zones, waypoints)
-    this.updateUtilityActors(deltaTime);
+    this.updateUtilityActors(deltaTime, roundTime);
 
     // 3. Fans (no direct updates - handled by sections in step 1)
     // Skip updateFanActors since sections handle them
 
     // 4. Vendors (behavior tick + movement handled by VendorActor)
-    this.updateVendorActors(deltaTime);
+    this.updateVendorActors(deltaTime, roundTime);
 
     // 5. Mascots (behavior tick)
-    this.updateMascotActors(deltaTime);
+    this.updateMascotActors(deltaTime, roundTime);
 
     // 6. Orchestration logic across actors
     this.handleVendorCollisions();
@@ -457,23 +462,23 @@ export class AIManager {
   }
 
   /** Update scenery actors (sections drive fan updates/aggregates) */
-  private updateSceneryActors(deltaTime: number, scene?: Phaser.Scene): void {
+  private updateSceneryActors(deltaTime: number, roundTime: number, scene?: Phaser.Scene): void {
     if (!this.actorRegistry) return;
     const sections = this.actorRegistry.getByCategory('section' as ActorCategory);
     for (const actor of sections) {
       // Get environmental modifier for this section
       const sectionId = (actor as any).data?.get('sectionId') || 'A';
       const envModifier = this.gameState.getEnvironmentalModifier(sectionId);
-      (actor as any).update(deltaTime, scene, envModifier);
+      (actor as any).update(deltaTime, roundTime, scene, envModifier);
     }
   }
 
   /** Update utility actors */
-  private updateUtilityActors(deltaTime: number): void {
+  private updateUtilityActors(deltaTime: number, roundTime: number): void {
     if (!this.actorRegistry) return;
     const utilities = this.actorRegistry.getByCategory('utility' as ActorCategory);
     for (const actor of utilities) {
-      actor.update(deltaTime);
+      actor.update(deltaTime, roundTime);
     }
   }
 
@@ -484,27 +489,58 @@ export class AIManager {
   }
 
   /** Update vendor actors */
-  private updateVendorActors(deltaTime: number): void {
+  private updateVendorActors(deltaTime: number, roundTime: number): void {
     if (!this.actorRegistry) return;
     const vendors = this.actorRegistry.getByCategory('vendor' as ActorCategory) as VendorActor[];
     for (const vendor of vendors) {
-      vendor.update(deltaTime);
+      vendor.update(deltaTime, roundTime);
     }
   }
 
   /** Update mascot actors */
-  private updateMascotActors(deltaTime: number): void {
+  private updateMascotActors(deltaTime: number, roundTime: number): void {
     // Use registered mascotActors list directly (avoids unsafe casts)
     for (const mascot of this.mascotActors) {
-      mascot.update(deltaTime);
+      mascot.update(deltaTime, roundTime);
       mascot.draw();
     }
   }
 
   /** Cross-actor: simple collision avoidance between vendors (stub) */
   private handleVendorCollisions(): void {
-    // TODO: Implement proximity checks and path re-routing
+    // Listen for vendor collision events from window (emitted by FanActor)
+    // When a vendor collides with a wave, roll for splat chance
+    if (typeof window !== 'undefined' && !this.collisionListenerAttached) {
+      this.collisionListenerAttached = true;
+      window.addEventListener('vendorCollision', (e: any) => {
+        const detail = e.detail || {};
+        const vendorId = detail.vendorId;
+        const gridRow = detail.gridRow;
+        const gridCol = detail.gridCol;
+        
+        console.log(`[AIManager] Vendor collision event for ${vendorId} at (${gridRow},${gridCol})`);
+        
+        // Find the vendor actor by ID
+        if (this.actorRegistry) {
+          const vendorActors = this.actorRegistry.getByCategory('vendor');
+          const vendorActor = vendorActors.find((v: any) => v.id === vendorId);
+          
+          if (vendorActor) {
+            const behavior = (vendorActor as any).getBehavior?.();
+            if (behavior && typeof behavior.handleCollisionSplat === 'function') {
+              console.log(`[AIManager] Calling handleCollisionSplat for ${vendorId}...`);
+              const vendorPos = (vendorActor as any).getGridPosition?.();
+              if (vendorPos) {
+                behavior.handleCollisionSplat(vendorPos);
+              }
+            }
+          }
+        }
+      });
+    }
   }
+  
+  private collisionListenerAttached = false;
 
   /** Cross-actor: balance vendor distribution across sections (stub) */
   private balanceVendorDistribution(): void {
@@ -523,8 +559,11 @@ export class AIManager {
       const behavior = (vendorActor as any).getBehavior?.();
       behavior?.onWaveSuccess?.();
     }
-    for (const mascot of this.mascotActors) {
-      (mascot as any).getBehavior?.().onWaveSuccess?.();
+    // Only charge mascot ult on FULL wave success, not per-section
+    if (data.type === 'full') {
+      for (const mascot of this.mascotActors) {
+        (mascot as any).getBehavior?.().onWaveSuccess?.();
+      }
     }
     this.emit('waveSuccessProcessed', data);
   }
@@ -557,11 +596,21 @@ export class AIManager {
   }
 
   /**
-   * Public helper to notify listeners that a vendor has completed service.
-   * Enables speech bubble and other service completion effects.
+   * Notify listeners that a vendor has completed dropoff and earned points
+   * @param actorId String actor ID (e.g., 'actor:vendor-0')
+   * @param pointsEarned Points earned from service
    */
-  public notifyVendorServiceComplete(vendorId: number): void {
-    this.emit('serviceComplete', { vendorId });
+  public notifyVendorDropoff(actorId: string, pointsEarned: number): void {
+    this.emit('vendorDropoff', { actorId, pointsEarned });
+  }
+
+  /**
+   * Notify listeners that a vendor has been splatted by a wave
+   * @param actorId String actor ID (e.g., 'actor:vendor-0')
+   * @param pointsLost Points lost from splat
+   */
+  public notifyVendorSplatted(actorId: string, pointsLost: number): void {
+    this.emit('vendorSplatted', { vendorId: actorId, pointsLost });
   }
 
   /**
@@ -570,16 +619,16 @@ export class AIManager {
   public recallVendor(vendorId: number): void {
     const vendorActor = this.vendorActors.get(vendorId);
     if (!vendorActor) {
-      console.warn(`[AIManager] recallVendor: unknown vendor ${vendorId}`);
+      // console.warn(`[AIManager] recallVendor: unknown vendor ${vendorId}`);
       return;
     }
     const behavior = vendorActor.getBehavior() as any;
     if (behavior && typeof behavior.forceRecallPatrol === 'function') {
       behavior.forceRecallPatrol();
       this.emit('vendorRecalled', { vendorId });
-      console.log(`[AIManager] Vendor ${vendorId} recalled -> patrol mode`);
+      if (gameBalance.debug.aiManagerLogs) console.log(`[AIManager] Vendor ${vendorId} recalled -> patrol mode`);
     } else {
-      console.warn(`[AIManager] recallVendor: behavior missing forceRecallPatrol for vendor ${vendorId}`);
+      // console.warn(`[AIManager] recallVendor: behavior missing forceRecallPatrol for vendor ${vendorId}`);
     }
   }
 

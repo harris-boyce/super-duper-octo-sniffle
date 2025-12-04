@@ -266,7 +266,7 @@ export class StadiumSection extends Phaser.GameObjects.Container {
         return this.flashFail();
       
       default:
-        console.warn(`Unknown animation '${animationName}' for StadiumSection`);
+        // console.warn(`Unknown animation '${animationName}' for StadiumSection`);
         return Promise.resolve();
     }
   }

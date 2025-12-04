@@ -76,9 +76,7 @@ export class MascotAnalytics {
     this.metrics.waveParticipationBefore = this.baselineParticipation;
 
     if (this.shouldReport()) {
-      console.log(
-        `[MascotAnalytics] Baseline participation: ${this.baselineParticipation.toFixed(1)}%`
-      );
+      // console.log(`[MascotAnalytics] Baseline participation: ${this.baselineParticipation.toFixed(1)}%`);
     }
   }
 
@@ -123,10 +121,7 @@ export class MascotAnalytics {
     }
 
     if (this.shouldReport()) {
-      console.log(
-        `[MascotAnalytics] Post-mascot participation: ${currentParticipation.toFixed(1)}% ` +
-          `(${this.metrics.participationImprovement > 0 ? '+' : ''}${this.metrics.participationImprovement.toFixed(1)}%)`
-      );
+      // console.log(`[MascotAnalytics] Post-mascot participation: ${currentParticipation.toFixed(1)}% (${this.metrics.participationImprovement > 0 ? '+' : ''}${this.metrics.participationImprovement.toFixed(1)}%)`);
     }
   }
 

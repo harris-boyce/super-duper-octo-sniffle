@@ -14,6 +14,6 @@ export class GameOverScene extends Phaser.Scene {
     // Display final score
     // Show AI announcer commentary
     // Add restart button
-    console.log('GameOverScene created');
+    // console.log('GameOverScene created');
   }
 }

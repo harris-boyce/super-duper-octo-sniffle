@@ -17,7 +17,7 @@ export class MenuScene extends Phaser.Scene {
       const url = new URL(window.location.href);
       this.debugMode = url.searchParams.get('debug') === 'true';
       if (this.debugMode) {
-        console.log('DEBUG MODE ENABLED');
+        // console.log('DEBUG MODE ENABLED');
       }
     } catch (e) {
       // Ignore URL parsing errors

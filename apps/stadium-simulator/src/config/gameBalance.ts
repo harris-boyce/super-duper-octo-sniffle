@@ -4,39 +4,46 @@
  */
 
 export const gameBalance = {
+  debug: {
+    sceneLogs: false,
+    vendorActorLogs: false,
+    aiManagerLogs: false,
+    vendorBehaviorLogs: false,
+    waveVerboseLogs: false
+  },
   /**
    * Fan stat configuration
    */
   fanStats: {
-    // === Initial Values ===
-    initialHappiness: 70,
+    // Initial stat ranges (Phase 5.5 adjusted for auto-wave balance)
+    initialHappiness: 70, // Matched to wave readiness threshold for immediate wave potential
     initialThirstMin: 15,
     initialThirstMax: 30,
-    initialAttention: 70,
+    initialAttention: 70, // Increased from 50 to give players time to engage vendors before attention drops
 
-    // === Thirst System (Predictable) ===
-    thirstRollChance: 0.20, // Reduced from 0.33 - less random spikes
-    thirstActivationAmount: 3, // Reduced from 5 - smaller jumps
-    thirstThreshold: 50, // When Phase 2 decay kicks in
-    thirstDecayRate: 2, // Linear growth after threshold
-    thirstReductionOnServe: 30, // Partial thirst reduction (not full reset) to create strategic timing gameplay
+    // Thirst two-phase linear system (Phase 5.2 refactor)
+    thirstPhase1Rate: 0.8, // Phase 1: Slow linear growth (0-60 thirst), pts/sec
+    thirstPhase2Rate: 2.5, // Phase 2: Fast linear growth (60-100 thirst), pts/sec
+    thirstPhase2Threshold: 60, // Threshold where thirst growth accelerates
     
-    // === Happiness System (Recovery Added) ===
+    // Legacy thirst config (deprecated but kept for reference)
+    thirstRollChance: 0.33, // DEPRECATED: Phase 1: Chance per second to START getting thirsty (0-1)
+    thirstActivationAmount: 5, // DEPRECATED: Phase 1: Big jump when roll succeeds (pushes over threshold)
+    thirstThreshold: 50, // DEPRECATED: Threshold for state transition (Phase 1 → Phase 2)
+    thirstDecayRate: 2, // DEPRECATED: Phase 2: Linear pts/sec after threshold
+    
     unhappyHappinessThreshold: 30, // When happiness drops below this, fan becomes unhappy
-    happinessDecayRate: 1.0, // When thirst > 50
-    happinessRecoveryOnServe: 5, // NEW: Vendor serve gives +5 happiness
-    happinessRecoveryOnWaveSuccess: 10, // NEW: Wave success gives +10 happiness
-    happinessMaximum: 100, // Cap at 100
-    
-    // === Attention System (Recovery Added) ===
-    attentionDecayRate: 1.5, // Passive decay
-    attentionRecoveryOnWaveSuccess: 30, // NEW: Big boost on wave success
-    attentionMinimum: 30, // Floor
-    attentionMaximum: 100, // Cap
-    
-    // === Freeze Durations ===
-    thirstFreezeDuration: 4000, // After vendor serve
-    attentionFreezeDuration: 5000, // After wave success
+    attentionDecayRate: 1.5,
+    attentionMinimum: 30,
+    waveStartThreshold: 70, // Happiness threshold for auto-wave triggering (Phase 5.3 refine) - lowered to 65 for forgiving opening
+    attentionMinimumForWave: 50, // Minimum attention required for wave readiness (Phase 5.3 refine)
+    // Attention-driven thirst mechanism (Issue #3)
+    attentionStagnationThreshold: 35, // If attention below this, fast thirst builds
+    attentionMinimumDuration: 8000, // ms that attention must stay below threshold before fast thirst kicks in
+
+    // Freeze durations (milliseconds)
+    thirstFreezeDuration: 4000,
+    attentionFreezeDuration: 5000,
 
     // === Wave Calculation ===
     waveChanceHappinessWeight: 0.5,
@@ -122,26 +129,29 @@ export const gameBalance = {
     // Master toggle for autonomous wave system
     enabled: true,
 
-    // Triggering thresholds
-    waveStartHappinessThreshold: 0.60, // section avg happiness (0-100) must be >= this (60%) to trigger wave
+    // Triggering thresholds (Phase 5.3 refactor)
+    minReadyFans: 4, // Number of fans needed in section to initiate wave
+    initiationCooldown: 15000, // ms between auto-waves from same section
+    
+    waveStartHappinessThreshold: 60, // LEGACY: section avg happiness (0-100) must be >= this (60%) to trigger wave
     
     // Cooldown durations (milliseconds)
     successCooldown: 5000, // 5 seconds after successful wave completes
     failureCooldown: 9000, // 9 seconds after failed wave (5s base + 4s penalty)
     sectionStartCooldown: 8000, // 8 seconds before same section can initiate another wave
     
-    // Happiness decay configuration (replaces linear decay)
-    thirstHappinessDecayThreshold: 50, // happiness only decays when thirst > this value
-    thirstHappinessDecayRate: 1.0, // happiness decay rate (points per second) when thirsty
+    // Happiness decay configuration (DEPRECATED - moved to clusterDecay in Phase 5.1)
+    thirstHappinessDecayThreshold: 50, // DEPRECATED: happiness only decays when thirst > this value
+    thirstHappinessDecayRate: 1.0, // DEPRECATED: happiness decay rate (points per second) when thirsty
     
     // Peer pressure mechanics (section aggregate behavior)
     peerPressureHappinessThreshold: 75, // section avg happiness must be >= this for peer pressure boost
     peerPressureAttentionBoost: 0.5, // attention boost (points per second) for all fans in section
     
     // Wave completion rewards
-    waveCompletionHappinessBoost: 15, // temporary happiness boost when wave completes successfully
-    waveCompletionAttentionBoost: 20, // temporary attention boost when wave completes successfully
-    waveBoostDuration: 5000, // duration (ms) of temporary boosts
+    waveCompletionHappinessBoost: 2, // temporary happiness boost when wave completes successfully - Phase 5.6: reduced from 5
+    waveCompletionAttentionBoost: 3, // temporary attention boost when wave completes successfully - Phase 5.6: reduced from 5
+    waveBoostDuration: 2000, // duration (ms) of temporary boosts - Phase 5.6: reduced from 3000
     
     // Section position weights (edge sections more likely to start waves)
     // Keys represent total section count, values are arrays of weights by position
@@ -171,11 +181,34 @@ export const gameBalance = {
   },
 
   /**
+   * Cluster-based happiness decay configuration (Phase 5.1)
+   * Replaces individual per-fan happiness decay with interval-based cluster selection
+   */
+  clusterDecay: {
+    earlyInterval: 10000, // ms between cluster decay triggers (early game) - increased from 5000
+    lateInterval: 5000, // ms between cluster decay triggers (late game) - increased from 2000
+    lateGameThreshold: 0.75, // session progress (0-1) where decay accelerates
+    clusterSizeMin: 8, // minimum fans affected per cluster - Phase 5.6: increased to 8 for more aggressive decay
+    clusterSizeMax: 16, // maximum fans affected per cluster - Phase 5.6: increased to 16 (half a section)
+    adjacencyRadius: 5, // Manhattan distance for adjacent fan selection - Phase 5.6: sections are 5×8 cells, radius 5 gives good local clustering
+    // Decay rates by session time (points per second of elapsed time since last decay event)
+    // These are multiplied by timeSinceLastDecay to calculate total decay applied per cluster event
+    // e.g., earlyDecayRate 2.7 pts/sec × 10 sec interval = 27 happiness decay per event
+    earlyDecayRate: 2.7, // 0-30s - 27 points per 10s interval
+    midDecayRate: 6.4, // 30-70s - 32 points per 5s interval
+    lateDecayRate: 8.0, // 70-100s - 40 points per 5s interval
+    // Attention decays at 2.5x the rate of happiness, but capped lower
+    attentionDecayCap: 11, // Max -11 attention per decay - Phase 5.6: increased 25% from 9 (267% increase from original 3)
+    earlyPhaseEnd: 30000, // ms
+    midPhaseEnd: 70000, // ms
+  },
+
+  /**
    * Wave timing configuration (all in milliseconds, converted to seconds where needed)
    */
   waveTiming: {
     triggerCountdown: 5000, // 5 seconds before wave fires
-    baseCooldown: 15000, // 15 seconds between waves
+    baseCooldown: 10000, // 10 seconds between waves
     successRefund: 5000, // refund this much if all sections succeed
     columnDelay: 44, // ms between column animations
     rowDelay: 6, // ms between row animations within column
@@ -187,6 +220,8 @@ export const gameBalance = {
   sessionConfig: {
     runModeDuration: 100000, // 100 seconds for stadium run
     eternalModeDuration: Infinity, // unlimited time for eternal mode
+    countdownDuration: 3000, // 3 second countdown overlay (3-2-1)
+    gracePeriod: 5000, // 5 second grace period after countdown before autonomous logic starts
   },
 
   /**
@@ -296,7 +331,7 @@ export const gameBalance = {
       scenery: 100,
       animatedActorBase: 150,
       animatedActorMin: 101,
-      animatedActorMax: 350, // Increased to accommodate 24-row grid (101 + 24*10 = 341)
+      animatedActorMax: 360, // Increased for floating text above animated actors
       animatedActorRowPenalty: 10,
     },
     waveCelebration: {
@@ -397,6 +432,9 @@ export const gameBalance = {
     emptySeatPenalty: 0, // no penalty for empty seats
     grumpPenaltyMultiplier: 2.0, // multiply base penalty by this for grumps
     maxTerrainPenalty: 0.90, // cap total penalty at 90% slowdown
+    
+    // Wave collision mechanics
+    waveCollisionPenalty: -30, // penalty to fan's wave participation chance when vendor present
     
     // Pathfinding parameters
     detourToleranceBase: 0.25, // penalty threshold to trigger local detour search
@@ -706,10 +744,11 @@ export const gameBalance = {
     abilityBaseIntervalMs: 8000, // interval between ability activations (8s)
     // Per-phase base stat boosts (non-ultimate)
     abilityEffects: {
-      section: { attention: 6, happiness: 3 }, // applied to one section
-      global: { attention: 3, happiness: 1 }, // applied stadium-wide
-      cluster: { attention: 8, happiness: 4 }, // applied only to low-attention cluster
+      section: { attention: -6, happiness: 5 }, // applied to one section
+      global: { attention: -3, happiness: 1 }, // applied stadium-wide
+      cluster: { attention: -8, happiness: 6 }, // applied only to low-attention cluster
       ultimateMultiplier: 1.5, // multiply above boosts when firing during ultimate
+      attentionDrain: 2, // attention drained from each targeted fan and added to bank (Phase 4.2)
     },
     // Cluster selection parameters
     cluster: {
@@ -742,6 +781,51 @@ export const gameBalance = {
     attentionTriggerThreshold: 45, // fire early if avg attention below this
     minFloorMs: 30000, // minimum effective cooldown floor (adjusted per Option A)
     diminishingReturnFactor: 0.25, // reduce future momentum effectiveness by 25% after an ultimate
+  },
+
+  /**
+   * Vendor scoring configuration
+   * Points earned based on service quality and dropoff mechanics
+   */
+  vendorScoring: {
+    basePoints: 10, // base points for any drink service (increased from 1)
+    slowThirstReductionBonus: 2, // multiplier when reducing phase-1 thirst (slow→none)
+    fastThirstReductionBonus: 5, // multiplier when reducing phase-2 thirst (fast→none)
+    highThirstThreshold: 80, // thirst threshold for fast-building detection
+    lowHappinessThreshold: 20, // happiness threshold for bonus
+  },
+
+  /**
+   * Drop zone configuration
+   * Visual and timing settings for vendor dropoff locations
+   */
+  dropZone: {
+    flashDuration: 500, // ms for white outline flash
+    flashColor: 0xffffff, // white
+    fadeOutDuration: 2000, // ms for vendor fade out
+    unavailableDelay: 3000, // ms vendor unavailable at drop zone
+    fadeInDuration: 1000, // ms for vendor fade in
+    floatingTextDuration: 1500, // ms for score text animation
+    floatingTextRiseDistance: 30, // pixels to rise
+    floatingTextColor: 0x00ff00, // green for positive score
+    floatingTextDepth: 10000, // depth for floating text (above all UI elements including section borders at 9999)
+  },
+
+  /**
+   * Wave-vendor collision configuration
+   * Risk/reward mechanics when waves hit vendors
+   */
+  waveCollision: {
+    sectionAttentionPenalty: 15, // Section-wide attention penalty
+    localHappinessPenalty: 10, // Local happiness penalty (within radius)
+    localRadius: 2, // Cell radius for local penalties
+    splatChancePerPoint: 0.05, // 5% chance per point earned (max 50%)
+    splatCooldownPenalty: 5000, // Extra cooldown (ms) on splat
+    splatRecoveryTime: 3000, // Time vendor stays splatted before recovering (ms)
+    seatRowMin: 14, // Min row for collision detection (seat zone)
+    seatRowMax: 17, // Max row for collision detection (seat zone)
+    columnTolerance: 0, // Exact column match required (±0)
+    rowTolerance: 1, // Allow vendors within ±1 row of seats
   },
 };
 

@@ -7,6 +7,7 @@ import Phaser from 'phaser';
 export class TargetingReticle extends Phaser.GameObjects.Container {
   private reticleCircle: Phaser.GameObjects.Graphics;
   private sectionHighlight: Phaser.GameObjects.Graphics | null = null;
+  private cooldownText: Phaser.GameObjects.Text | null = null;
   private isActive: boolean = false;
   private currentSection: number | null = null;
 
@@ -76,11 +77,18 @@ export class TargetingReticle extends Phaser.GameObjects.Container {
    * Set whether current position is a valid target
    * @param isValid True if hovering over valid section
    * @param sectionIdx Section index if valid
+   * @param customColor Optional custom color for reticle (e.g., orange for cooldown)
    */
-  public setTargetable(isValid: boolean, sectionIdx: number | null = null): void {
+  public setTargetable(isValid: boolean, sectionIdx: number | null = null, customColor?: number): void {
+    // Determine reticle color
+    let color = isValid ? 0x00ff00 : 0xff0000; // Green or red
+    if (customColor !== undefined) {
+      color = customColor; // Override with custom color (e.g., orange for cooldown)
+    }
+    
     // Update reticle color
     this.reticleCircle.clear();
-    this.reticleCircle.lineStyle(2, isValid ? 0x00ff00 : 0xff0000, 1);
+    this.reticleCircle.lineStyle(2, color, 1);
     
     // Outer circle
     this.reticleCircle.strokeCircle(0, 0, 20);
@@ -93,7 +101,7 @@ export class TargetingReticle extends Phaser.GameObjects.Container {
 
     // Update section highlight
     if (isValid && sectionIdx !== null && sectionIdx !== this.currentSection) {
-      this.highlightSection(sectionIdx);
+      this.highlightSection(sectionIdx, color);
       this.currentSection = sectionIdx;
     } else if (!isValid && this.currentSection !== null) {
       this.clearSectionHighlight();
@@ -102,63 +110,101 @@ export class TargetingReticle extends Phaser.GameObjects.Container {
   }
 
   /**
+   * Set cooldown text near reticle
+   * @param text Text to display (empty string to hide)
+   */
+  public setCooldownText(text: string): void {
+    if (!text) {
+      // Hide cooldown text
+      if (this.cooldownText) {
+        this.cooldownText.setVisible(false);
+      }
+      return;
+    }
+    
+    // Create or update cooldown text
+    if (!this.cooldownText) {
+      this.cooldownText = this.scene.add.text(0, -40, text, {
+        fontSize: '14px',
+        fontFamily: 'Arial',
+        color: '#ff8800',
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        padding: { x: 6, y: 4 }
+      });
+      this.cooldownText.setOrigin(0.5, 0.5);
+      this.cooldownText.setDepth(1001); // Above reticle
+      this.add(this.cooldownText);
+    }
+    
+    this.cooldownText.setText(text);
+    this.cooldownText.setVisible(true);
+  }
+
+  /**
    * Highlight a section
    * @param sectionIdx Section index to highlight
+   * @param color Optional color for highlight (defaults to green)
    */
-  private highlightSection(sectionIdx: number): void {
+  private highlightSection(sectionIdx: number, color: number = 0x00ff00): void {
     this.clearSectionHighlight();
     
     // Create semi-transparent highlight overlay
     this.sectionHighlight = this.scene.add.graphics();
     this.sectionHighlight.setDepth(999); // Below reticle but above everything else
     
-    // Dynamic section bounds derived from grid seat ranges.
-    // Seat grid ranges duplicated from StadiumScene.getSectionAtGridPosition:
-    // Section A: cols 2-9, rows 15-18
-    // Section B: cols 12-19, rows 15-18
-    // Section C: cols 22-29, rows 15-18
-    // We compute world-space rectangle by converting the top-left and bottom-right
-    // seat cell centers to world coords via gridToWorld and then expanding to cover
-    // full cell extents.
+    // Get actual section bounds from SectionActors instead of hardcoding
     const sceneAny: any = this.scene as any;
-    const gridManager = sceneAny.gridManager; // Access private via any (surgical, replace later with injected ref)
-    if (!gridManager) {
-      console.warn('[TargetingReticle] gridManager unavailable; using legacy hardcoded highlight');
+    const actorRegistry = sceneAny.actorRegistry;
+    const gridManager = sceneAny.gridManager;
+    
+    if (!actorRegistry || !gridManager) {
+      // console.warn('[TargetingReticle] actorRegistry or gridManager unavailable; using legacy hardcoded highlight');
       const legacyWidth = 256;
       const legacyHeight = 128;
       const legacyOffsetX = 128;
       const legacyOffsetY = 480;
       const lx = legacyOffsetX + (sectionIdx * (legacyWidth + 64));
       const ly = legacyOffsetY;
-      this.sectionHighlight.fillStyle(0x00ff00, 0.15);
+      this.sectionHighlight.fillStyle(color, 0.15);
       this.sectionHighlight.fillRect(lx, ly, legacyWidth, legacyHeight);
-      this.sectionHighlight.lineStyle(2, 0x00ff00, 0.5);
+      this.sectionHighlight.lineStyle(2, color, 0.5);
       this.sectionHighlight.strokeRect(lx, ly, legacyWidth, legacyHeight);
       return;
     }
 
-    const cellSize = gridManager.getWorldSize().cellSize;
+    // Query SectionActors from registry
+    const sectionActors = actorRegistry.getByCategory('section');
+    if (!sectionActors || sectionActors.length <= sectionIdx) {
+      // console.warn(`[TargetingReticle] Section ${sectionIdx} not found in registry`);
+      return;
+    }
 
-    interface Range { colStart: number; colEnd: number; rowStart: number; rowEnd: number; }
-    const ranges: Range[] = [
-      { colStart: 2, colEnd: 9, rowStart: 15, rowEnd: 18 },   // A
-      { colStart: 12, colEnd: 19, rowStart: 15, rowEnd: 18 }, // B
-      { colStart: 22, colEnd: 29, rowStart: 15, rowEnd: 18 }  // C
-    ];
-    const r = ranges[sectionIdx];
-    if (!r) return;
+    const sectionActor = sectionActors[sectionIdx];
+    const sectionData = sectionActor.getSectionData();
+    if (!sectionData) {
+      // console.warn(`[TargetingReticle] Section ${sectionIdx} has no data`);
+      return;
+    }
+
+    const cellSize = gridManager.getWorldSize().cellSize;
+    
+    // Get seat row bounds from actual section data (e.g., rows 14-17)
+    const rowStart = sectionData.gridTop;
+    const rowEnd = sectionData.gridTop + 3; // 4 seat rows
+    const colStart = sectionData.gridLeft;
+    const colEnd = sectionData.gridRight;
 
     // Convert top-left seat cell center then adjust by half cell size to get true top-left corner.
-    const topLeftCenter = gridManager.gridToWorld(r.rowStart, r.colStart);
-    const bottomRightCenter = gridManager.gridToWorld(r.rowEnd, r.colEnd);
+    const topLeftCenter = gridManager.gridToWorld(rowStart, colStart);
+    const bottomRightCenter = gridManager.gridToWorld(rowEnd, colEnd);
     const x = topLeftCenter.x - cellSize / 2;
     const y = topLeftCenter.y - cellSize / 2;
-    const width = (r.colEnd - r.colStart + 1) * cellSize;
-    const height = (r.rowEnd - r.rowStart + 1) * cellSize;
+    const width = (colEnd - colStart + 1) * cellSize;
+    const height = (rowEnd - rowStart + 1) * cellSize;
 
-    this.sectionHighlight.fillStyle(0x00ff00, 0.15);
+    this.sectionHighlight.fillStyle(color, 0.15);
     this.sectionHighlight.fillRect(x, y, width, height);
-    this.sectionHighlight.lineStyle(2, 0x00ff00, 0.5);
+    this.sectionHighlight.lineStyle(2, color, 0.5);
     this.sectionHighlight.strokeRect(x, y, width, height);
   }
 
