@@ -41,6 +41,10 @@ export class MascotBehavior implements AIActorBehavior {
   private lastUltimateAt: number = 0;
   private consecutiveWaveSuccesses: number = 0;
   private momentumEffectivenessFactor: number = 1.0; // reduced by diminishing returns after ultimate
+  
+  // Attention economy (Phase 4.2)
+  private attentionBank: number = 0; // 0-100 range
+  private ultimateReady: boolean = false; // true when attentionBank >= 30
 
   // Timers
   private abilityTimer: number = 0;
@@ -138,6 +142,28 @@ export class MascotBehavior implements AIActorBehavior {
     return this.state;
   }
 
+  /** Get attention bank value (Phase 4.2) */
+  public getAttentionBank(): number {
+    return this.attentionBank;
+  }
+
+  /** Check if ultimate is ready (Phase 4.3) */
+  public isUltimateReady(): boolean {
+    return this.ultimateReady;
+  }
+
+  /** Drain attention bank to 0 (called on ultimate fire) */
+  public drainAttentionBank(): void {
+    this.attentionBank = 0;
+    this.ultimateReady = false;
+  }
+
+  /** Add attention to bank (from fan drains) */
+  public addAttention(amount: number): void {
+    this.attentionBank = Math.min(100, this.attentionBank + amount);
+    this.ultimateReady = this.attentionBank >= 30;
+  }
+
   /** External trigger from wave success to update momentum */
   public onWaveSuccess(): void {
     this.consecutiveWaveSuccesses++;
@@ -146,6 +172,11 @@ export class MascotBehavior implements AIActorBehavior {
       1.0,
       this.momentumEffectivenessFactor + 0.05 // restore 5% per wave success
     );
+    // Add +10 to attention bank on wave success (Phase 4.3)
+    const oldBank = this.attentionBank;
+    this.attentionBank = Math.min(100, this.attentionBank + 10);
+    this.ultimateReady = this.attentionBank >= 30;
+    console.log(`[MascotBehavior] Wave success! Attention bank: ${oldBank} → ${this.attentionBank} (Ultimate ready: ${this.ultimateReady})`);
   }
 
   /** External trigger from wave failure to reset momentum */
@@ -191,6 +222,9 @@ export class MascotBehavior implements AIActorBehavior {
     );
     // Reset momentum chain after ultimate
     this.consecutiveWaveSuccesses = 0;
+    // Drain attention bank to 0 (Phase 4.3)
+    this.attentionBank = 0;
+    this.ultimateReady = false;
     this.state = 'patrolling';
     this.advanceCycle();
   }
@@ -202,8 +236,12 @@ export class MascotBehavior implements AIActorBehavior {
     }
   }
 
-  /** Behavior tick called each frame */
-  public tick(deltaTime: number): void {
+  /** 
+   * Behavior tick called each frame 
+   * @param deltaTime - Time elapsed in milliseconds
+   * @param roundTime - Time relative to round start (negative = remaining, positive = elapsed)
+   */
+  public tick(deltaTime: number, roundTime: number): void {
     const now = performance.now();
     this.tickAccumulator += deltaTime;
 
@@ -252,6 +290,7 @@ export class MascotBehavior implements AIActorBehavior {
       attention: Math.round(base.attention * multiplier),
       happiness: Math.round(base.happiness * multiplier)
     };
+    const attentionDrain = this.abilityEffects.attentionDrain || 2;
 
     if (!this.aiManager || !this.aiManager.getSectionActors) {
       this.emit('mascotStatEffect', { phase, effect, ultimate, targets: 'global' });
@@ -265,8 +304,13 @@ export class MascotBehavior implements AIActorBehavior {
     }
 
     if (phase === 'global') {
-      // Global application (handled later by GameStateManager)
-      this.emit('mascotStatEffect', { phase, effect, ultimate, targets: 'global' });
+      // Global application to all fans
+      let targetedFans: any[] = [];
+      for (const s of sections) {
+        targetedFans = targetedFans.concat(s.getFanActors());
+      }
+      this.applyStatsToFans(targetedFans, effect, attentionDrain);
+      this.emit('mascotStatEffect', { phase, effect, ultimate, targets: 'global', fanCount: targetedFans.length });
       return;
     }
 
@@ -285,7 +329,9 @@ export class MascotBehavior implements AIActorBehavior {
         this.emit('mascotStatEffect', { phase, effect, ultimate, targets: 'global' });
         return;
       }
-      this.emit('mascotStatEffect', { phase, effect, ultimate, targets: [chosen] });
+      const fanActors = chosen.getFanActors();
+      this.applyStatsToFans(fanActors, effect, attentionDrain);
+      this.emit('mascotStatEffect', { phase, effect, ultimate, targets: [chosen], fanCount: fanActors.length });
       return;
     }
 
@@ -301,13 +347,30 @@ export class MascotBehavior implements AIActorBehavior {
       }
       if (fallback) {
         const fanActors = fallback.getFanActors();
-        this.emit('mascotStatEffect', { phase, effect, ultimate, targets: fanActors });
+        this.applyStatsToFans(fanActors, effect, attentionDrain);
+        this.emit('mascotStatEffect', { phase, effect, ultimate, targets: fanActors, fanCount: fanActors.length });
       } else {
         this.emit('mascotStatEffect', { phase, effect, ultimate, targets: 'global' });
       }
       return;
     }
-    this.emit('mascotStatEffect', { phase, effect, ultimate, targets: targetCluster });
+    this.applyStatsToFans(targetCluster, effect, attentionDrain);
+    this.emit('mascotStatEffect', { phase, effect, ultimate, targets: targetCluster, fanCount: targetCluster.length });
+  }
+
+  /** Apply stat effects to fans and drain attention to bank (Phase 4.1 & 4.2) */
+  private applyStatsToFans(fanActors: any[], effect: { attention: number; happiness: number }, attentionDrain: number): void {
+    for (const fanActor of fanActors) {
+      if (fanActor && typeof fanActor.modifyStats === 'function') {
+        // Apply stat boosts
+        fanActor.modifyStats({ attention: effect.attention, happiness: effect.happiness });
+        // Drain attention and add to bank
+        fanActor.modifyStats({ attention: -attentionDrain });
+        this.attentionBank = Math.min(100, this.attentionBank + attentionDrain);
+      }
+    }
+    // Update ultimate ready flag
+    this.ultimateReady = this.attentionBank >= 30;
   }
 
   /** Find a cluster of low-attention fans across sections */

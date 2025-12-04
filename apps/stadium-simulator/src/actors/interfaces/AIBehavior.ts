@@ -23,6 +23,10 @@ export enum AIActorState {
   Recalling = 'recalling',
   /** Vendor is patrolling in neutral zone */
   Patrolling = 'patrolling',
+  /** Vendor is dropping off at drop zone (fade out, delay, fade in) */
+  DroppingOff = 'droppingOff',
+  /** Vendor was hit by wave and is splatting (tumbling, falling, prone) */
+  Splatted = 'splatted',
 }
 
 /**
@@ -49,8 +53,9 @@ export interface AIActorBehavior {
    * Called every frame by the actor's update method
    * 
    * @param deltaTime Time elapsed since last tick (milliseconds)
+   * @param roundTime Time relative to round start (negative = time remaining in timed mode, positive = elapsed in eternal mode)
    */
-  tick(deltaTime: number): void;
+  tick(deltaTime: number, roundTime: number): void;
 
   /**
    * Handle arrival at current path destination

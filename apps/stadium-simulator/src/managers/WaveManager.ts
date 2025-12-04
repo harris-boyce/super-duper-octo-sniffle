@@ -32,12 +32,16 @@ export class WaveManager {
   private actorRegistry?: ActorRegistry; // ActorRegistry reference
   private eventListeners: Map<string, Array<Function>>;
   private propagating: boolean;
+  // Wave cooldown tracking (prevents overlapping waves)
+  private lastWaveCompleteTime: number = 0;
+  private waveCooldown: number = gameBalance.waveTiming.baseCooldown; // 15 seconds base
   // private seatManager?: SeatManager; // DELETED - logic moved to SectionActor
   private waveSprite?: WaveSprite; // WaveSprite instance
   private waveSpriteCreated: boolean = false;
   private pathSectionActors: any[] = []; // Track current path for jump logic (SectionActor[])
   private gridColumnSequence: Array<{ sectionActor: any; col: number; worldX: number }> = []; // Grid columns to traverse
   private currentGridColumnIndex: number = 0; // Current position in sequence
+  private currentRoundTime: number = 0; // Round time for collision logging (negative = remaining, positive = elapsed)
   private waveSputter: {
     active: boolean;
     columnsRemaining: number;
@@ -107,8 +111,13 @@ export class WaveManager {
   /**
    * Per-frame update hook to advance sprite-driven wave movement.
    * Should be called by the scene each frame.
+   * @param delta - Time elapsed in milliseconds
+   * @param roundTime - Time relative to round start (negative = remaining, positive = elapsed)
    */
-  public update(delta: number): void {
+  public update(delta: number, roundTime: number): void {
+    // Store roundTime for collision logging
+    this.currentRoundTime = roundTime;
+    
     if (!this.waveSprite || typeof this.waveSprite.update !== 'function') {
       return; // Guard against undefined sprite
     }
@@ -116,6 +125,23 @@ export class WaveManager {
     this.waveSprite.update(delta);
     // Sprite may have completed and been destroyed during update()
     if (!this.waveSprite) return;
+
+    // Continuous collision detection: Check all columns the wave is currently covering
+    // NOTE: Collision detection now handled by FanActor during wave participation roll
+    // Removed redundant WaveManager collision checking
+    /*
+    if (this.activeWave && this.currentGridColumnIndex > 0 && this.currentGridColumnIndex < this.gridColumnSequence.length) {
+      // Check the current column and recent columns (wave might span 1-2 columns)
+      const columnsToCheck = [
+        this.gridColumnSequence[this.currentGridColumnIndex - 1], // Previous column (just passed)
+        this.gridColumnSequence[this.currentGridColumnIndex]      // Current column (approaching)
+      ].filter(Boolean);
+
+      for (const colData of columnsToCheck) {
+        this.checkVendorCollisions(colData.sectionActor.getSectionId(), colData.col);
+      }
+    }
+    */
 
     // Snap sprite to grid columns for discrete column-by-column movement
     if (this.gridColumnSequence.length > 0 && this.currentGridColumnIndex < this.gridColumnSequence.length) {
@@ -154,26 +180,26 @@ export class WaveManager {
     if (!this.gridManager) return;
     const sectionActor = colData.sectionActor;
     if (!sectionActor) {
-      console.warn(`[WaveManager.triggerColumn] No sectionActor for colData`);
+      // console.warn(`[WaveManager.triggerColumn] No sectionActor for colData`);
       return;
     }
     
     // Access seats directly through SectionActor's rowActors
     const sectionData = sectionActor.getSectionData();
     if (!sectionData) {
-      console.warn(`[WaveManager.triggerColumn] No sectionData for ${sectionActor.id}`);
+      // console.warn(`[WaveManager.triggerColumn] No sectionData for ${sectionActor.id}`);
       return;
     }
     
     const colIndex = colData.col - sectionData.gridLeft;
     const rowActors = sectionActor.getRowActors();
-    console.log(`[WaveManager.triggerColumn] Section ${sectionActor.getSectionId()} col ${colData.col} (localCol=${colIndex}), rowActors: ${rowActors.length}`);
+    // console.log(`[WaveManager.triggerColumn] Section ${sectionActor.getSectionId()} col ${colData.col} (localCol=${colIndex}), rowActors: ${rowActors.length}`);
     
     const seatsInColumn = rowActors
       .map((rowActor: any) => rowActor.getSeatAt(colIndex))
       .filter(Boolean);
     
-    console.log(`[WaveManager.triggerColumn] Found ${seatsInColumn.length} seats in column ${colIndex}, emitting columnWaveReached`);
+    // console.log(`[WaveManager.triggerColumn] Found ${seatsInColumn.length} seats in column ${colIndex}, emitting columnWaveReached`);
     
     this.emit('columnWaveReached', {
       sectionId: sectionActor.getSectionId(),
@@ -184,6 +210,9 @@ export class WaveManager {
       waveStrength: this.getCurrentWaveStrength(),
       visualState: this.getColumnVisualState(this.waveSputter.active)
     });
+
+    // NOTE: Vendor collision detection now handled by FanActor during wave participation roll
+    // Old checkVendorCollisions() method removed - collision detection moved to FanActor.rollForWaveParticipation()
   }
 
   /**
@@ -399,17 +428,30 @@ export class WaveManager {
    * @param success - Whether wave completed successfully
    */
   public recordWaveEnd(success: boolean): void {
-    const cooldown = success 
-      ? gameBalance.waveAutonomous.successCooldown
-      : gameBalance.waveAutonomous.failureCooldown;
+    // Update cooldown based on success
+    // Full wave success: reduce cooldown from 15s base to 10s (15 - 5 refund)
+    // Partial/failed wave: keep at 15s base
+    this.waveCooldown = success 
+      ? gameBalance.waveTiming.baseCooldown - gameBalance.waveTiming.successRefund
+      : gameBalance.waveTiming.baseCooldown;
     
-    this.lastWaveEndTime = Date.now();
-    this.lastWaveCooldownDuration = cooldown;
+    this.lastWaveCompleteTime = Date.now();
     
     // legacy wave end console logging removed
     
     // Emit event with cooldown info
-    this.emit('waveCooldownStarted', { success, cooldown, endsAt: this.lastWaveEndTime + cooldown });
+    this.emit('waveCooldownStarted', { success, cooldown: this.waveCooldown, endsAt: this.lastWaveCompleteTime + this.waveCooldown });
+  }
+
+  /**
+   * Check if wave is in global cooldown (prevents waves while one is active or during cooldown)
+   */
+  public isWaveOnCooldown(): boolean {
+    if (this.active) {
+      return true; // Wave is active
+    }
+    const timeSinceComplete = Date.now() - this.lastWaveCompleteTime;
+    return timeSinceComplete < this.waveCooldown;
   }
 
   /**
@@ -427,15 +469,15 @@ export class WaveManager {
    */
   public checkWaveProbability(): string | null {
     if (!gameBalance.waveAutonomous.enabled) {
-      console.log('[WaveManager.checkWaveProbability] Autonomous waves disabled');
+      // console.log('[WaveManager.checkWaveProbability] Autonomous waves disabled');
       return null;
     }
     if (this.active || this.propagating) {
-      console.log('[WaveManager.checkWaveProbability] Wave already active or propagating');
+      // console.log('[WaveManager.checkWaveProbability] Wave already active or propagating');
       return null;
     }
     if (this.isInGlobalCooldown()) {
-      console.log('[WaveManager.checkWaveProbability] In global cooldown');
+      // console.log('[WaveManager.checkWaveProbability] In global cooldown');
       return null;
     }
 
@@ -455,7 +497,7 @@ export class WaveManager {
 
     if (shouldLog) {
       this.lastProbabilityCheckLog = now;
-      console.log(`[WaveManager.checkWaveProbability] Checking ${sections.length} sections`);
+      // console.log(`[WaveManager.checkWaveProbability] Checking ${sections.length} sections`);
     }
 
     // Create weighted section order
@@ -516,13 +558,13 @@ export class WaveManager {
 
       // Check if this section triggers a wave
       if (roll < baseProbability) {
-        console.log(`[WaveManager.checkWaveProbability] Wave triggered by section ${section.id} (happiness: ${avgHappiness.toFixed(1)}%, roll: ${(roll*100).toFixed(1)}% < ${(baseProbability*100).toFixed(0)}%)`);
+        // console.log(`[WaveManager.checkWaveProbability] Wave triggered by section ${section.id} (happiness: ${avgHappiness.toFixed(1)}%, roll: ${(roll*100).toFixed(1)}% < ${(baseProbability*100).toFixed(0)}%)`);
         return section.id;
       }
     }
 
     if (shouldLog) {
-      console.log('[WaveManager.checkWaveProbability] No wave triggered this check');
+      // console.log('[WaveManager.checkWaveProbability] No wave triggered this check');
     }
     return null;
   }
@@ -554,6 +596,12 @@ export class WaveManager {
 
     // Emit event for visuals (incoming cue)
     this.emit('waveCreated', { wave: wave.toJSON() });
+
+    // Emit countdown event for section blink effect
+    this.emit('waveCountdownStarted', { 
+      sectionId: originSectionId, 
+      countdown: gameBalance.waveTiming.triggerCountdown 
+    });
 
     // Actually start the wave propagation!
     this.startWave();
@@ -864,7 +912,7 @@ export class WaveManager {
     if (this.countdown <= 0) {
       // Spawn/reuse WaveSprite when countdown completes
       if (!this.propagating && this.scene && this.activeWave && this.gridManager && this.actorRegistry) {
-        console.log('[WaveManager] Countdown complete, spawning WaveSprite');
+        // console.log('[WaveManager] Countdown complete, spawning WaveSprite');
         // Query SectionActor objects for the wave path
         const sectionActors = this.activeWave.path.map(sectionId =>
           this.actorRegistry!.query({ category: 'section' as any })
@@ -885,7 +933,7 @@ export class WaveManager {
    */
   public spawnWaveSprite(scene: Phaser.Scene, sectionActors: any[]): void {
     if (!this.gridManager) {
-      console.warn('WaveManager: Cannot spawn WaveSprite without GridManager');
+      // console.warn('WaveManager: Cannot spawn WaveSprite without GridManager');
       return;
     }
 
@@ -918,11 +966,11 @@ export class WaveManager {
     }
 
     if (this.gridColumnSequence.length === 0) {
-      console.warn('WaveManager: No grid columns found in path');
+      // console.warn('WaveManager: No grid columns found in path');
       return;
     }
 
-    console.log(`[WaveManager] Built grid sequence: ${this.gridColumnSequence.length} columns across ${sectionActors.length} sections`);
+    // console.log(`[WaveManager] Built grid sequence: ${this.gridColumnSequence.length} columns across ${sectionActors.length} sections`);
 
     // Get precise seat-based bounds for vertical line rendering
     const sectionBounds: Array<{ id: string; left: number; right: number; top: number; bottom: number }> = [];
@@ -945,7 +993,7 @@ export class WaveManager {
     }
 
     if (sectionBounds.length === 0) {
-      console.warn('WaveManager: No valid section bounds');
+      // console.warn('WaveManager: No valid section bounds');
       return;
     }
 
@@ -957,7 +1005,7 @@ export class WaveManager {
     const targetX = this.gridColumnSequence[this.gridColumnSequence.length - 1].worldX;
     this.currentGridColumnIndex = 0;
     
-    console.log('[WaveManager] Start X:', startX, 'Target X:', targetX, 'Direction:', direction);
+    // console.log('[WaveManager] Start X:', startX, 'Target X:', targetX, 'Direction:', direction);
     
     // Only create WaveSprite once, then re-use
     if (!this.waveSpriteCreated) {
@@ -995,19 +1043,19 @@ export class WaveManager {
       this.waveSprite.startMovement();
     } else if (this.waveSprite) {
       // Re-use existing sprite: reset and reconfigure
-      console.log('[WaveManager] Reusing existing WaveSprite');
+      // console.log('[WaveManager] Reusing existing WaveSprite');
       this.waveSprite.resetState();
       this.waveSprite.setSections(sectionBounds);
       this.waveSprite.setLineBounds(lineTop, lineBottom);
       this.waveSprite.setWaveStrength(this.getCurrentWaveStrength());
       this.waveSprite.configure(startX, direction, targetX);
       this.waveSprite.startMovement();
-      console.log('[WaveManager] WaveSprite reuse complete, movement started');
+      // console.log('[WaveManager] WaveSprite reuse complete, movement started');
     }
   }
 
   private handleSpriteExitsSection(sectionId: string): void {
-    console.log(`[WaveManager] handleSpriteExitsSection: ${sectionId}`);
+    // console.log(`[WaveManager] handleSpriteExitsSection: ${sectionId}`);
     // Calculate section state from recorded column states for this section
     const sectionColumns = this.columnStateRecords.filter(r => r.sectionId === sectionId);
     let successCount = 0;
@@ -1025,7 +1073,7 @@ export class WaveManager {
     if (successCount >= sputterCount && successCount >= deathCount) sectionState = 'success';
     else if (sputterCount >= deathCount) sectionState = 'sputter';
     const avgParticipation = sectionColumns.length > 0 ? totalParticipation / sectionColumns.length : 0;
-    console.log(`[WaveManager] Section ${sectionId} complete: ${sectionState} (S:${successCount} SP:${sputterCount} D:${deathCount}, avg ${Math.round(avgParticipation*100)}%)`);
+    // console.log(`[WaveManager] Section ${sectionId} complete: ${sectionState} (S:${successCount} SP:${sputterCount} D:${deathCount}, avg ${Math.round(avgParticipation*100)}%)`);
     
     // Query SectionActor for aggregate stats
     const sectionActor = this.actorRegistry?.query({ category: 'section' as any })
@@ -1059,10 +1107,12 @@ export class WaveManager {
     }
     // Award points for successful sections
     if (sectionState === 'success') {
-      this.score += 100;
+      const points = 100;
+      this.score += points;
+      this.gameState.addWaveScore(points);
       this.gameState.incrementSectionSuccesses();
       if (typeof window !== 'undefined') {
-        console.log(`[DEBUG] Score incremented! New score: ${this.score}`);
+        // console.log(`[DEBUG] Score incremented! New score: ${this.score}`);
       }
     }
     // No manual jump needed - grid column sequence handles inter-section gaps automatically
@@ -1073,7 +1123,7 @@ export class WaveManager {
    * Finalizes wave and emits completion event
    */
   private handleWaveComplete(): void {
-    console.log('[WaveManager] handleWaveComplete');
+    // console.log('[WaveManager] handleWaveComplete');
     
     // Handle final section (sprite never exits the last section, so we need to emit here)
     // The final section is the last one in gridColumnSequence (accounting for wave direction)
@@ -1086,7 +1136,7 @@ export class WaveManager {
         // Check if we already handled this section via exit event
         const alreadyHandled = this.waveResults.some(r => r.section === finalSectionId);
         if (!alreadyHandled) {
-          console.log(`[WaveManager] handleWaveComplete: Processing final section ${finalSectionId}`);
+          // console.log(`[WaveManager] handleWaveComplete: Processing final section ${finalSectionId}`);
           this.handleSpriteExitsSection(finalSectionId);
         }
       }

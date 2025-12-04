@@ -96,18 +96,18 @@ export class LevelService {
         { id: 'vendor-2', type: 'food', gridRow: 20, gridCol: 20 }
       ];
       
-      console.log('[LevelService] Loaded stadium config:', stadiumConfig);
-      console.log('[LevelService] Stadium config has cellRanges:', !!stadiumConfig.cellRanges, 'count:', stadiumConfig.cellRanges?.length);
-      console.log('[LevelService] Stadium config has cells:', !!stadiumConfig.cells, 'count:', stadiumConfig.cells?.length);
-      console.log('[LevelService] Generated sections:', sections);
+      // console.log('[LevelService] Loaded stadium config:', stadiumConfig);
+      // console.log('[LevelService] Stadium config has cellRanges:', !!stadiumConfig.cellRanges, 'count:', stadiumConfig.cellRanges?.length);
+      // console.log('[LevelService] Stadium config has cells:', !!stadiumConfig.cells, 'count:', stadiumConfig.cells?.length);
+      // console.log('[LevelService] Generated sections:', sections);
       
       const result = { gridConfig: stadiumConfig, sections, vendors, stairs };
-      console.log('[LevelService] Returning result.gridConfig has cellRanges:', !!result.gridConfig.cellRanges);
+      // console.log('[LevelService] Returning result.gridConfig has cellRanges:', !!result.gridConfig.cellRanges);
       
       return result;
       
     } catch (error) {
-      console.error('[LevelService] Failed to load level data:', error);
+      // console.error('[LevelService] Failed to load level data:', error);
       
       // Fallback to hardcoded data if JSON fails
       return this.loadLevelFallback();
@@ -118,7 +118,7 @@ export class LevelService {
    * Fallback hardcoded level data (original implementation)
    */
   private static async loadLevelFallback(): Promise<LevelData> {
-    console.warn('[LevelService] Using fallback hardcoded level data');
+    // console.warn('[LevelService] Using fallback hardcoded level data');
     
     // Section layout: 3 sections, each 8x4, with stairs directly adjacent
     // Section A: gridLeft 2-9 (8 columns, with left gutter)
@@ -156,7 +156,7 @@ export class LevelService {
       return {
         id: cfg.id,
         label: cfg.label,
-        gridTop: 15,
+        gridTop: 14,
         gridLeft: cfg.left,
         gridRight: cfg.left + 7,
         gridBottom: 18,
@@ -169,17 +169,17 @@ export class LevelService {
       {
         id: 'stairs-A-B',
         gridLeft: 10,  // Directly after Section A (2-9)
-        gridTop: 15,
+        gridTop: 14,
         width: 2,
-        height: 4,
+        height: 5,
         connectsSections: ['A', 'B']
       },
       {
         id: 'stairs-B-C',
         gridLeft: 20, // Directly after Section B (12-19)
-        gridTop: 15,
+        gridTop: 14,
         width: 2,
-        height: 4,
+        height: 5,
         connectsSections: ['B', 'C']
       }
     ];

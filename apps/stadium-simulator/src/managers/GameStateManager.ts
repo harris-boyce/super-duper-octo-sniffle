@@ -40,10 +40,18 @@ export class GameStateManager {
   private completedWaves: number = 0;
   private waveAttempts: number = 0;
   private totalSectionSuccesses: number = 0;
+  private vendorScore: number = 0; // Track vendor service points
+  private waveScore: number = 0;   // Track wave points
+  private lostVendorPoints: number = 0; // Points lost due to vendor splats
+  private lostWavePoints: number = 0;   // Points lost due to failed waves
   private initialAggregateStats: AggregateStats | null = null;
   private eventListeners: Map<string, Array<Function>>;
   private waveBoosts: Map<string, WaveBoost> = new Map(); // Track temporary boosts per section
   private logger = LoggerService.instance();
+  
+  // Cluster decay state (global coordination)
+  private clusterDecayTimer: number = 0;
+  private sessionStartTime: number = 0;
 
   constructor() {
     // Initialize empty sections array - will be populated by initializeSections()
@@ -282,6 +290,27 @@ export class GameStateManager {
   }
 
   /**
+   * Get elapsed time since session start in seconds
+   * @returns Elapsed time in seconds
+   */
+  public getSessionElapsedTime(): number {
+    if (this.sessionState === 'idle' || this.sessionState === 'complete') {
+      return 0;
+    }
+    return (Date.now() - this.sessionStartTime) / 1000;
+  }
+
+  /**
+   * Get round time for passing to update calls
+   * @returns Negative value (time remaining) in timed mode, positive (elapsed) in eternal mode
+   */
+  public getRoundTime(): number {
+    // For now, always return negative (time remaining) since we're in timed mode
+    // TODO: Add eternal mode support
+    return -this.sessionTimeRemaining / 1000; // Convert ms to seconds
+  }
+
+  /**
    * Get number of completed waves
    */
   public getCompletedWaves(): number {
@@ -289,7 +318,70 @@ export class GameStateManager {
   }
 
   /**
-   * Increment completed waves counter
+   * Get vendor service score
+   */
+  public getVendorScore(): number {
+    return this.vendorScore;
+  }
+
+  /** Get wave score */
+  public getWaveScore(): number {
+    return this.waveScore;
+  }
+
+  /** Get total combined score */
+  public getTotalScore(): number {
+    return this.vendorScore + this.waveScore - this.lostVendorPoints - this.lostWavePoints;
+  }
+
+  /**
+   * Add points from vendor service
+   */
+  public addVendorScore(points: number): void {
+    this.vendorScore += points;
+    this.logger.push({
+      level: 'info',
+      category: 'system:score',
+      message: `Vendor score: +${points} (total: ${this.vendorScore})`,
+      ts: Date.now()
+    });
+  }
+
+  /** Add points from successful waves */
+  public addWaveScore(points: number): void {
+    this.waveScore += points;
+    this.logger.push({
+      level: 'info',
+      category: 'system:score',
+      message: `Wave score: +${points} (total: ${this.waveScore})`,
+      ts: Date.now()
+    });
+  }
+
+  /** Track points lost due to vendor splats */
+  public addLostVendorPoints(points: number): void {
+    this.lostVendorPoints += points;
+    this.logger.push({
+      level: 'warn',
+      category: 'system:score',
+      message: `Lost vendor points: +${points} (total: ${this.lostVendorPoints})`,
+      ts: Date.now()
+    });
+  }
+
+  /** Track points lost due to wave crashes/failures */
+  public addLostWavePoints(points: number): void {
+    this.lostWavePoints += points;
+    this.logger.push({
+      level: 'warn',
+      category: 'system:score',
+      message: `Lost wave points: +${points} (total: ${this.lostWavePoints})`,
+      ts: Date.now()
+    });
+  }
+
+  /**
+   * Increment wave count
    */
   public incrementCompletedWaves(): void {
     this.completedWaves++;
@@ -447,5 +539,46 @@ export class GameStateManager {
    */
   private clamp(value: number, min: number, max: number): number {
     return Math.min(Math.max(value, min), max);
+  }
+
+  /**
+   * Trigger cluster decay for sections in randomized order with diminishing returns
+   * Called from AIManager.update() to coordinate decay across all sections
+   */
+  public updateClusterDecay(delta: number, sessionTime: number, actorRegistry: any): void {
+    this.clusterDecayTimer += delta;
+    
+    // Get interval based on session progress
+    const progress = sessionTime / gameBalance.sessionConfig.runModeDuration;
+    const interval = progress >= gameBalance.clusterDecay.lateGameThreshold
+      ? gameBalance.clusterDecay.lateInterval
+      : gameBalance.clusterDecay.earlyInterval;
+    
+    if (this.clusterDecayTimer < interval) {
+      return; // Not time yet
+    }
+    
+    this.clusterDecayTimer = 0;
+    
+    // Get all section actors and randomize order
+    const sectionActors = actorRegistry?.getByCategory('section') || [];
+    if (sectionActors.length === 0) return;
+    
+    const shuffled = [...sectionActors].sort(() => Math.random() - 0.5);
+    
+    // Roll for decay with diminishing chance for each section
+    let diminishingMultiplier = 1.0;
+    for (const sectionActor of shuffled) {
+      // Roll for decay with diminishing returns
+      const roll = Math.random();
+      const threshold = 0.6 * diminishingMultiplier; // 60% base chance, reduced per section
+      
+      if (roll < threshold) {
+        // This section triggers decay
+        sectionActor.flagForDecay?.();
+        // Apply diminishing returns: next section has 60% of the chance
+        diminishingMultiplier *= 0.6;
+      }
+    }
   }
 }

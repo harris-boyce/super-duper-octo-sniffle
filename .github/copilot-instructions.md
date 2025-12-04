@@ -1,282 +1,186 @@
-# Stadium Simulator - AI Coding Agent Instructions
+# Stadium Simulator — AI Coding Agent Quickstart
 
-## Project Overview
+Concise, repo-specific guidance to make AI agents immediately productive. Keep changes minimal, follow existing patterns, and reference files by path.
 
-**Stadium Simulator** is an 8-bit retro Phaser 3 game where players initiate stadium waves across three sections while managing fan engagement (happiness, thirst, attention). The game features AI-powered announcer commentary via Claude API and grid-based vendor AI pathfinding. Game runs 100-second timed sessions only (run mode).
+## Architecture Essentials
 
-## Architecture Overview
+**Actor Pattern** — Three-layer separation for all dynamic entities:
+- `Actor` (pure stats/state) → `Behavior` (AI/logic) → `Sprite` (visual). See `src/actors/`, `src/actors/behaviors/`, `src/sprites/`.
+- Example: `FanActor` manages `happiness`/`thirst`/`attention` stats, derives `FanState` (`happy`|`thirsty`|`disengaged`), and delegates visuals to `Fan` sprite.
+- States are **derived** from stats via `deriveStateFromStats()`, never set manually. Transitions trigger `updateContinuousVisuals()`.
 
-### 0. **CRITICAL: Actor State Machine Pattern & Separation of Concerns**
+**CRITICAL: Never Manipulate Sprites Directly from External Events**
+- ❌ WRONG: `sprite.playAnimation()` called from scene event handlers
+- ✅ RIGHT: Modify actor stats → actor derives new state → actor calls sprite methods
+- **Flow**: Event → Actor.modifyStats() → Actor.deriveStateFromStats() → Actor.transitionToState() → Sprite.playAnimation()
+- Example: T-shirt cannon hit → `fanActor.modifyStats({happiness: +3})` → fan derives `excited` state → `sprite.playExcitedJump()`
+- **Always** route through the actor's state machine. Sprites are dumb visual objects with no business logic.
 
-**ALL dynamic game entities (Fans, Vendors, Mascots) MUST follow this architecture:**
+**Managers** — Domain logic in `src/managers/`:
+- `GameStateManager`: Central game state (score, timer, sections)
+- `WaveManager`: Wave propagation logic with event emission (`sectionSuccess`, `waveComplete`)
+- `AIManager`: Vendor AI coordination and mascot targeting
+- `GridManager`: World coordinate system, zone types (sky/seat/aisle/stairs/ground), pathfinding support
+- All managers extend `BaseManager` (in `managers/helpers/`) and use event-driven API: `manager.on(event, handler)`, `manager.emit(event, data)`.
 
-#### Three-Layer Separation:
-1. **Stats Layer** (Pure Data)
-   - Raw numeric values: happiness, thirst, attention, position, etc.
-   - Modified by `updateStats(delta)`, `setThirst()`, `modifyStats()`
-   - NO visual updates, NO sprite manipulation
-   - Example: `FanActor.updateStats()` modifies thirst++, happiness--, but does NOT call sprite methods
+**Scenes** — Pure orchestration in `src/scenes/`:
+- `StadiumScene.ts` is the main game scene. Scenes call `manager.update(delta)`, listen to manager events, and create/update sprites.
+- **No game logic in scenes**: No stat checks, no state transitions, no thresholds. Managers decide, scenes visualize.
 
-2. **State Machine Layer** (Derived Logic)
-   - State is derived from stats via threshold checks
-   - States: `idle`, `engaged`, `disengaged`, `waving`, `drinking`, `moving`, `serving`, etc.
-   - Implemented via `deriveStateFromStats()` → returns state based on conditions
-   - State transitions trigger visual updates via `transitionToState(newState)`
-   - Example: `FanActor.deriveStateFromStats()` checks `attention < 30 && happiness < 40` → returns `'disengaged'`
+**Sprites** — Pure Phaser visuals in `src/sprites/`:
+- Extend `BaseActorContainer` or `BaseActorSprite` (in `sprites/helpers/`).
+- No game rules or config access. Sprites expose methods like `setIntensity(val)`, `playAnimation(name)`, called by actors.
 
-3. **Visual Layer** (Presentation)
-   - Sprite methods called ONLY during state transitions or continuous update loops
-   - State-based visuals: alpha, tint, scale (applied on state change)
-   - Continuous visuals: color interpolation, jiggle timers (applied every frame)
-   - Example: `updateVisualsForState('disengaged')` sets alpha=0.7, tint=gray
+**Config** — All tuning in `src/config/gameBalance.ts`:
+- Fan stats, vendor behavior, wave mechanics, thresholds. **Never hardcode magic numbers.**
 
-#### Update Flow (Every Frame):
+## Core Patterns
+
+**Actor Update Loop:**
 ```typescript
-// In Actor.update(delta):
-updateStats(delta);              // 1. Modify raw stats
-updateContinuousVisuals();       // 2. Smooth visual updates (color, jiggle)
-newState = deriveStateFromStats(); // 3. Check thresholds
-if (newState !== state) {
-  transitionToState(newState);   // 4. Trigger state-based visuals
-}
-```
-
-#### Examples:
-
-**FanActor State Machine:**
-- Stats: `happiness`, `thirst`, `attention` (0-100)
-- States: `idle` (default), `engaged` (attention > 70), `disengaged` (attention < 30 && happiness < 40), `drinking` (thirst < 10 && freeze active), `waving` (during wave animation)
-- Continuous visuals: `fan.setIntensity(thirst/100)` every frame (color + jiggle)
-- State-based visuals: alpha/tint applied only when transitioning to/from `disengaged`
-
-**VendorActor State Machine (via DrinkVendorBehavior):**
-- Stats: `position`, `speed`, `serviceTimer`
-- States: `idle`, `moving`, `serving`, `patrolling`, `recalling`
-- State transitions: `idle` → scan for target → `moving` → arrive at fan → `serving` → timer expires → `idle`
-- Visuals: sprite position updated during `moving`, animation played during `serving`
-
-#### Anti-Patterns (DO NOT DO THIS):
-```typescript
-// ❌ BAD: Stat update triggers visual directly
-public setThirst(value: number): void {
-  this.thirst = value;
-  this.fan.setIntensity(value / 100); // WRONG! Tight coupling
-}
-
-// ❌ BAD: Scene manually checks fan conditions
-if (fan.getThirst() > 50 && fan.getHappiness() < 40) {
-  fan.setAlpha(0.7); // WRONG! Scene shouldn't know fan states
-}
-
-// ✅ CORRECT: Stat update is pure data
-public setThirst(value: number): void {
-  this.thirst = Phaser.Math.Clamp(value, 0, 100);
-  // Visual update deferred to update() state machine
-}
-
-// ✅ CORRECT: State machine handles visuals
-public update(delta: number): void {
-  this.updateContinuousVisuals(); // Color/jiggle every frame
-  const newState = this.deriveStateFromStats();
+update(delta: number) {
+  this.updateStats(delta);           // Modify raw stats (thirst, happiness)
+  this.updateContinuousVisuals();    // Sync sprite intensity/animations
+  const newState = this.deriveStateFromStats();  // Calculate state from stats
   if (newState !== this.state) {
-    this.transitionToState(newState); // Alpha/tint on state change
+    this.transitionToState(newState); // Trigger state change + visuals
   }
 }
 ```
+Example: `FanActor.ts` transitions to `disengaged` when `attention < 30 && happiness < 40`.
 
-**When implementing new actor logic:**
-1. Define states as type union: `type FanState = 'idle' | 'engaged' | ...`
-2. Add `state` and `previousState` fields to actor
-3. Implement `deriveStateFromStats()` with threshold checks
-4. Implement `transitionToState(newState)` to trigger `updateVisualsForState()`
-5. Split visuals into state-based (alpha, tint) vs continuous (color, position)
-6. Call `update(delta)` from parent (e.g., SectionActor for fans)
+**Vendor Behavior States:**
+- `DrinkVendorBehavior` (in `src/actors/behaviors/`) implements `AIActorBehavior` interface.
+- States: `awaitingAssignment` → `idle` → `targeting` → `moving` → `serving` → `recalling` → `splatted`.
+- On service complete: `fan.drinkServed()` adjusts stats (thirst -100, happiness +15), behavior tracks `pointsEarned`.
+- Wave collision: Vendors can be "splatted" by waves with probability based on `pointsEarned` (risk/reward mechanic).
 
-### 1. **Actor System** (`src/actors/`)
-Game entities use a three-level hierarchy, decoupled from Phaser GameObjects:
-- **AnimatedActor**: Dynamic entities (Fans, Vendors, Mascots) with stats/state that affect logic
-- **SceneryActor**: Static visuals (Stadium sections, rows, seats)
-- **UtilityActor**: Non-visual logic entities (Wave states, waypoints, zones)
+**Wave Mechanics:**
+- `WaveManager.propagateWave()` iterates sections/columns via `ActorRegistry` and `GridManager`.
+- Success chance formula: `80 + happiness*0.2 - thirst*0.3 + vendorEffects`.
+- Emits: `sectionSuccess`, `sectionFail`, `waveComplete` with context.
 
-**Key Components:**
-- `ActorFactory`: Generates unique IDs like `actor:fan-0`, `actor:section-A`
-- `ActorRegistry`: Central registry for all actors; supports queries by category/kind with `query()`, `getByCategory()`, `snapshot()`
-- `adapters/`: Wrapper classes connecting legacy Phaser sprites to Actor system (FanActor wraps Fan sprite, etc.)
-- Location: `src/actors/interfaces/ActorTypes.ts` defines `ActorCategory`, `ActorKind`, `ActorSnapshot`
+**ActorRegistry API:**
+- `register(actor)`, `unregister(id)`, `get(id)`, `getByCategory(category)`, `query(filter)`.
+- Example: `actorRegistry.query({ category: 'fan', type: 'fan' })` returns all fan actors.
+- IDs via `ActorFactory.generateId()` format: `actor:type-identifier` (e.g., `actor:fan-0-0`).
 
-### 2. **Manager-Based Game Logic** (`src/managers/`)
-Each manager handles one domain and emits events using `Map<string, Function[]>` pattern:
-- **GameStateManager**: 3 stadium sections (A, B, C) with stat tracking; `on('eventName')`, `emit('eventName')`
-- **WaveManager**: Wave countdown, section propagation, success chance calculation (`80 + happiness*0.2 - thirst*0.3`), sputter mechanics
-- **AIManager**: Vendor spawning, state machine, distraction logic
-- **GridManager**: World grid coordinate system (grid↔world conversions via `gridToWorld()`)
-- **AnnouncerService**: Claude API integration (see Integration Points below)
+**GridManager Coordinates:**
+- Actors/behaviors use **grid coords** (row, col): `gridManager.worldToGrid(x, y)`, `gridToWorld(row, col)`.
+- Sprites use **world coords** (x, y pixels). Always convert at the boundary.
+- Zone types: `sky`, `seat`, `aisle`, `stairs`, `ground`. Check `cell.passable` and `cell.zoneType`.
 
-**Interface Location**: `src/managers/interfaces/` contains `Section.ts`, `WaveState.ts`, `VendorTypes.ts`, etc.
+**Namespace Organization:**
+- Interfaces in `{namespace}/interfaces/`: `import type { Section } from '@/managers/interfaces/Section'`.
+- Helpers in `{namespace}/helpers/`: `import { BaseManager } from '@/managers/helpers/BaseManager'`.
+- Path alias `@` maps to `src/`.
 
-### 3. **Scene Orchestration** (`src/scenes/StadiumScene.ts`)
-Main game loop that:
-- Instantiates all managers in `create()`
-- Calls manager `update(deltaTime)` methods in Phaser's `update()` callback
-- Listens to manager events, updates sprite visuals and text UI
-- Manages sprite lifecycle (Fan, Vendor, WaveSprite instances created via event listeners)
+**Mascot System:**
+- `MascotActor` + `MascotBehavior` follow actor/behavior pattern like vendors.
+- Targeting cycles: `section` → `global` → `cluster` (deterministic rotation).
+- Ultimate ability: Triggered based on cooldown (45s base) and momentum from consecutive wave successes.
+- T-shirt cannon: Fire 3-5 shots per activation, apply global boosts + targeted attention/happiness effects.
+- Configuration: `gameBalance.mascotBehavior.*`, `gameBalance.mascotUltimate.*`, `gameBalance.mascotCannon.*`.
+- See `docs/MASCOT_SYSTEM.md` for complete details.
 
-Related scenes: MenuScene (start screen), WorldScene (container for grid), GridOverlay (debug visualization).
+## Developer Workflows
 
-### 4. **Configuration Centralization** (`src/config/gameBalance.ts`)
-**All magic numbers live here.** Never hardcode values. Examples:
-- Fan stats: `thirstGrowthPerSecond: 2`, `happinessDecay: 1`
-- Wave timing: `triggerCountdown: 3000ms`
-- Session duration: `runModeDuration: 100000ms` (100 seconds)
-- Success formula: `baseSuccessChance: 80`, happiness multiplier `0.2`, thirst multiplier `-0.3`
-- Vendor config: `spawnCount: 2`, `quality: 'good'`
-
-## Critical Data Flows
-
-### Wave Propagation (Grid-Based, Asynchronous)
-1. `waveManager.startWave()` begins 3-second countdown
-2. Countdown ends → `propagateWave()` queries `ActorRegistry.getByCategory('section')` for all SectionActors
-3. For each SectionActor's grid columns:
-   - Calculate success chance: `baseChance + (happiness * happinessBonus) - (thirst * thirstPenalty)` + vendor interference
-   - Roll random(0-100) vs chance
-   - Emit `sectionSuccess` or `sectionFail` asynchronously with 1-second delay
-   - Track participation rate and strength per column in `WaveCalculationResult[]`
-4. On final section: emit `waveComplete` with cumulative results
-
-**Grid Integration**: `SectionActor` (in `actors/adapters/SectionActor.ts`) composes `SectionRowActor` instances which contain `SeatActor` children. Wave propagation traverses the grid column-by-column.
-
-### Session Management (Run Mode Only)
-- `gameState.startSession('run')`: Snapshots initial stats across 3 sections
-- `gameState.activateSession()`: Begins session (called after countdown overlay)
-- `gameState.updateSession(deltaTime)`: Decrements `sessionTimeRemaining`; at 0, calls `completeSession()`
-- `gameState.calculateSessionScore()`: Compares final vs initial stats, assigns grade (S+, S, A, B, C, D, F based on wave count and percentage)
-
-### Stat Decay (Every Frame)
-`gameState.updateStats(deltaTime)` runs in `StadiumScene.update()`:
-- Happiness: `-1 pt/sec` (always)
-- Thirst: `+2 pts/sec` (always)
-- Attention: `-0.5 pts/sec` (always, when not engaged)
-
-All stats are 0-100 bounded.
-
-### Vendor AI & Pathfinding
-- **VendorManager** (`AIManager`): Spawns vendors, manages state machine (idle → planning → movingSegment → serving → cooldown)
-- **HybridPathResolver** & **GridManager**: Vendor pathfinding uses A* on navigation grid; currently stubbed with linear movement
-- **Vendor Events**: `vendorSpawned`, `vendorReachedTarget`, `serviceComplete`, `vendorDistracted`
-- **Fan Integration**: When vendor reaches target, calls `fan.drinkServed()` (thirst -100, happiness +15)
-
-## Development Workflows
-
+**Dev Server:**
 ```bash
 cd apps/stadium-simulator
-
-# Development
-npm run dev              # Vite dev server (http://localhost:3000)
-npm run type-check       # TypeScript check only
-npm run build            # Production build (dist/)
-
-# Testing (now minimal - most old tests deleted)
-npm test                 # Run Vitest (uses happy-dom, not browser)
-npm run test:ui          # Interactive test runner
-
-# Debugging
-# URL: ?demo=debug loads TestSectionDebugScene (isolated feature testing)
+npm run dev              # Vite at http://localhost:3000
+npm run dev:full         # Vercel dev (includes serverless functions)
 ```
 
-## Key Conventions
-
-### File Organization
-- **Managers**: Pure business logic, no Phaser dependencies (except type imports for `Phaser.Scene`)
-- **Scenes**: Orchestration + rendering; call manager methods, listen to events
-  - **Scenes NEVER directly manipulate actor stats or check thresholds**
-  - Scenes only call actor `update(delta)` and listen to manager events
-- **Adapters** (`actors/adapters/`): Wrapper classes that connect legacy Phaser sprites to Actor system
-- **Sprites** (`sprites/`): Phaser GameObjects (Fan, Vendor, WaveSprite, etc.); extend Phaser classes; **PURE VISUAL ONLY**
-  - Sprites expose methods like `setIntensity()`, `setAlpha()`, `playAnimation()`
-  - Sprites DO NOT contain game logic, stat management, or condition checks
-  - Sprites DO NOT reference `gameBalance` config directly (actors pass values)
-- **Interfaces**: Each namespace has `interfaces/` subfolder (managers, actors, sprites)
-- **Helpers**: Each namespace has `helpers/` subfolder (BaseManager, BaseActor, ActorLogger)
-- **Behaviors** (`actors/behaviors/`): Encapsulate complex AI logic (targeting, pathfinding, state machines)
-  - Behaviors are attached to actors and called via `behavior.tick(delta)`
-  - Example: `DrinkVendorBehavior` handles vendor target selection and movement
-
-### Type Imports
-```typescript
-// Interfaces live in namespace/interfaces/
-import type { Section } from '@/managers/interfaces/Section';
-import type { ActorCategory } from '@/actors/interfaces/ActorTypes';
-import type { VendorProfile } from '@/managers/interfaces/VendorTypes';
-
-// Or bulk import via index
-import type { Section, WaveState } from '@/managers/interfaces';
+**Build & Type Check:**
+```bash
+npm run build            # TypeScript compile + Vite build
+npm run type-check       # tsc --noEmit (strict mode)
 ```
 
-### Event Pattern (All Managers)
-```typescript
-// Subscribe to events
-manager.on('eventName', (payload) => {
-  // handle payload
-});
-
-// Emit events
-manager.emit('eventName', payload);
+**Testing:**
+```bash
+npm test                 # Vitest (happy-dom environment)
+npm run test:ui          # Vitest UI browser
+npm run test:coverage    # Coverage report
+npm run test:api         # API tests only (vitest.api.config.ts)
 ```
+
+**Debug Tools:**
+- Add `?demo=debug` to URL to load debug scene.
+- Press `G` in-game to toggle grid overlay (if enabled).
+- Check `gameBalance.debug.*` flags in `src/config/gameBalance.ts` for verbose logging.
+
+**Deployment:**
+- GitHub Pages: `.github/workflows/deploy.yml` auto-deploys on push to `main`.
+- Vercel: `npm run vercel:deploy` (requires env vars: `ANTHROPIC_API_KEY`, `ADMIN_API_KEY`).
+- Base path: `/stadium-simulator/` for GitHub Pages, `/` for Vercel.
+
+## Conventions
+
+- **Scenes don't modify state:** Scenes listen to events and update visuals only.
+- **Sprites don't read config:** All thresholds/rules in managers or actors.
+- **Config is single source:** Edit `src/config/gameBalance.ts` for tuning, not inline constants.
+- **Interfaces are separate:** Use `src/{namespace}/interfaces/` for type definitions.
+- **Event cleanup:** Always unsubscribe from manager events in scene `shutdown()`.
+- **Logging:** Use `LoggerService.instance()` for structured logging, not `console.log` (except temporary debugging).
+- **State enums:** Import `AIActorState` from `@/actors/interfaces/AIBehavior` for behavior state machines.
+- **Testing:** Vitest with `happy-dom` environment. Phaser mocked via `src/__tests__/setup.ts`. Run `npm test` for all, `npm run test:api` for API-only.
+
+**Score Display vs Tracking:**
+- HUD shows only total running score via `GameStateManager.getTotalScore()`.
+- Track breakdowns internally (wave gained, vendor gained, wave lost, vendor lost) for end-of-session reporting.
+- Vendor behaviors track individual `pointsEarned` for scoring and splat probability.
 
 ## Integration Points
 
-### Claude API (AnnouncerService)
-- **Endpoint**: `import.meta.env.VITE_ANTHROPIC_API_URL` (default: https://api.anthropic.com/v1/messages)
-- **Model**: `claude-3-5-sonnet-20241022`
-- **Headers**: `x-api-key` (from env), `anthropic-version: 2023-06-01`
-- **Max tokens**: 150
-- **Fallback**: Returns "The crowd goes wild!" on network error
-- **Called from**: StadiumScene on significant events (wave success, session start, vendor distraction)
+**Claude AI Announcer:**
+- API: `api/announcer.ts` (Vercel serverless function).
+- Client: `AnnouncerService.ts` in `src/managers/`.
+- Model: `claude-3-5-sonnet-20241022`, max tokens: 150.
+- Events: `waveStart`, `sectionSuccess`, `sectionFail`, `waveComplete`.
+- Fallback on error: "The crowd goes wild!".
 
-### Vite Path Aliases
-`@` resolves to `src/`. Use in all imports:
-```typescript
-import { GameStateManager } from '@/managers/GameStateManager';
-import { ActorRegistry } from '@/actors/ActorRegistry';
-```
+**Level Data:**
+- JSON config: `public/assets/stadium-grid-config.json` (2173 lines).
+- Loader: `LevelService.ts` in `src/services/`.
+- Structure: `gridConfig` (rows, cols, cellSize, zone ranges), `sections`, `vendors`, `stairs`, `fans`.
 
-### GitHub Pages Deployment
-- **Base path**: `/stadium-simulator/`
-- **Workflow**: `.github/workflows/deploy.yml` auto-deploys `main` → `gh-pages`
-- **Build**: Run `npm run build` to generate `dist/`
+**Pathfinding:**
+- Service: `PathfindingService.ts` (A* implementation).
+- Integration: `GridManager` provides `getNeighbors(row, col)` with walls and transitions.
+- Vendor behaviors use `pathfindingService.findPath(start, goal)`.
 
-## Common Pitfalls
+**Vendor Scoring & Drop Zones:**
+- Behaviors track `pointsEarned` internally: base points + bonuses for high thirst/low happiness.
+- Drop zones: Designated grid cells where vendors return, flash white, fade out, then respawn after cooldown.
+- Floating text: Score displays above drop zone (`floatingTextDepth: 10000` to render above all UI).
+- Configuration: `gameBalance.vendorScoring.*`, `gameBalance.dropZone.*`.
 
-1. **Hardcoded values**: Never add magic numbers; update `gameBalance.ts` instead
-2. **Stat→Visual coupling**: Never call sprite methods from stat setters; use state machine
-3. **Scene logic leakage**: Scenes orchestrate, they don't implement game rules or check thresholds
-4. **Event listener leaks**: Remove listeners in scene's `shutdown` event; unsubscribe in manager cleanup
-5. **Actor ID conflicts**: Use `ActorFactory.generateId()` or specify custom suffix (e.g., `section-A`)
-6. **Grid vs world coords**: GridManager handles conversion; actors use grid positions, sprites use world positions
-7. **Type imports**: Import interfaces from `{namespace}/interfaces/`, not `types/` directory
-8. **Environment variables**: Only `VITE_*` prefix exposed to client; sensitive keys in `.env` (not committed)
-9. **Sprite logic contamination**: If a sprite has `if (thirst > 50)` checks, refactor to actor state machine
+**Wave-Vendor Collision (Splat Mechanic):**
+- When wave propagates through vendor's position, `handleCollisionSplat()` rolls for splat.
+- Splat chance: `pointsEarned * splatChancePerPoint` (capped at 50%, higher score = higher risk).
+- On splat: Vendor enters `splatted` state for `splatRecoveryTime` ms, section attention penalty applied.
+- Configuration: `gameBalance.waveCollision.*` (row ranges, tolerances, penalties).
 
-## Current State & Recent Changes
+**Logging System:**
+- Use `LoggerService.instance()` singleton for structured logging (not `console.log`).
+- Provides categorized log entries with timestamps for debugging and analytics.
+- Found in `src/services/LoggerService.ts`, used by `ActorRegistry` and other core systems.
 
-- **Actor System**: Fully implemented with adapters for FanActor, VendorActor, SectionActor, WaveSpriteActor
-- **State Machine Architecture**: FanActor fully refactored with state machine pattern (stats → state → visuals)
-- **Behavior-Driven Architecture**: DrinkVendorBehavior handles AI targeting via SectionActor queries; actors drive visual updates
-- **Fan Logic Migration**: All fan game logic moved from Fan sprite to FanActor (stats, wave participation, terrain penalties)
-- **Sprite Purification**: Fan sprite is now purely visual (no stat checks, no game logic, no gameBalance references)
-- **Vendor Integration**: Vendors spawn, pathfind (stubbed linear), select targets via behaviors, serve fans via FanActor.drinkServed
-- **Code Reorganization**: Interfaces moved to `{namespace}/interfaces/`, helpers to `{namespace}/helpers/`
-- **Test Cleanup**: Most old tests deleted except AnnouncerService.test.ts; focus on manual testing for now
-- **Eternal Mode**: Removed; only run mode (100-second sessions) supported
+## Current Focus Areas (Branch: sb/add-vendor-scoring-and-splat)
 
-## Next Implementation Priorities
+- ✅ **Completed**: Vendor scoring system with point tracking and drop zone mechanics.
+- ✅ **Completed**: Wave-vendor collision system with splat state and risk/reward mechanics.
+- ✅ **Completed**: Mascot system - actor/behavior pattern, targeting cycles, ultimate ability, wave success charging.
+- 🔄 **Active**: Phase 5 - Fan Stat Decay Refactor (cluster-based happiness decay, linear thirst, auto-wave triggers).
+- 📋 **Next**: Phase 6 - Announcer Box & Event Callouts (atmospheric enhancement).
 
-- [ ] Refactor RipplePropagationEngine to use FanActor state machine (remove Fan sprite dependencies)
-- [ ] Refactor MascotTargetingAI to use FanActor.getIsDisinterested() (remove Fan sprite dependencies)
-- [ ] Implement MascotBehavior with state machine pattern (idle, scanning, targeting, firing, cooldown)
-- [ ] Complete HybridPathResolver A* pathfinding (currently linear)
-- [ ] Vendor collision detection + navigation graph refinement
-- [ ] Remove deprecated AIManager.scanningInSection sprite access when behaviors handle pathfinding state
-- [ ] Menu and GameOverScene UI implementations
-- [ ] Pixel art asset creation + sprite sheet integration
-- [ ] Audio event triggers (Howler.js 8-bit sounds)
+## Quick References
+
+- Actor queries: `ActorRegistry.getByCategory('section')`, `query({ type: 'fan' })`.
+- Grid conversion: `gridManager.worldToGrid(x, y)`, `gridToWorld(row, col)`.
+- Depth sorting: `gridManager.getDepthForPosition(row, col)` or `getDepthForWorld(x, y)`.
+- Tests: `apps/stadium-simulator/src/__tests__/` (490 passing), `api/__tests__/` (API tests).
+
+Questions? Reference specific files and this doc will be refined.

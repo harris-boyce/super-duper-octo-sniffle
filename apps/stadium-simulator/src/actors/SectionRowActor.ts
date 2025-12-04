@@ -22,6 +22,7 @@ export interface SectionRowActorOptions {
   container: Phaser.GameObjects.Container;
   scene: Phaser.Scene;
   gridManager: any;
+  actorRegistry?: any;
 }
 
 /**
@@ -40,6 +41,7 @@ export class SectionRowActor extends SceneryActor {
   private container: Phaser.GameObjects.Container;
   private scene: Phaser.Scene;
   private gridManager: any;
+  private actorRegistry?: any;
   private seats: SeatActor[] = [];
   private rowVisuals: Phaser.GameObjects.Container;
   private blocked: boolean = false;
@@ -60,6 +62,7 @@ export class SectionRowActor extends SceneryActor {
     this.container = opts.container;
     this.scene = opts.scene;
     this.gridManager = opts.gridManager;
+    this.actorRegistry = opts.actorRegistry;
 
     // Create visual container for this row
     this.rowVisuals = this.scene.add.container(0, 0);
@@ -124,6 +127,10 @@ export class SectionRowActor extends SceneryActor {
       const gridCol = this.gridLeft + col;
       const seatId = `${this.sectionId}-${this.rowIndex}-${col}`;
       const seat = new SeatActor(col, this.gridTop, gridCol, seatId);
+      // Register seat with ActorRegistry
+      if (this.actorRegistry) {
+        this.actorRegistry.register(seat);
+      }
       this.seats.push(seat);
 
       // Register seat with grid manager

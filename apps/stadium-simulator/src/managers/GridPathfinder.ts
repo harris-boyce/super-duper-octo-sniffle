@@ -58,18 +58,18 @@ export class GridPathfinder extends BaseManager {
 
     if (!startGrid || !endGrid) {
       if (DEBUG_PATHFIND) {
-        console.warn('[GridPathfinder] Invalid start or end position', { 
-          from: { x: fromX, y: fromY }, 
-          to: { x: toX, y: toY },
-          startGrid,
-          endGrid
-        });
+        // console.warn('[GridPathfinder] Invalid start or end position', { 
+        //   from: { x: fromX, y: fromY }, 
+        //   to: { x: toX, y: toY },
+        //   startGrid,
+        //   endGrid
+        // });
       }
       return [];
     }
 
     if (DEBUG_PATHFIND) {
-      console.log(`[GridPathfinder] Starting A* from (${startGrid.row},${startGrid.col}) to (${endGrid.row},${endGrid.col})`);
+      // console.log(`[GridPathfinder] Starting A* from (${startGrid.row},${startGrid.col}) to (${endGrid.row},${endGrid.col})`);
     }
 
     // Run A* algorithm
@@ -77,15 +77,15 @@ export class GridPathfinder extends BaseManager {
 
     if (path.length === 0) {
       if (DEBUG_PATHFIND) {
-        console.warn(`[GridPathfinder] No path found from (${startGrid.row},${startGrid.col}) to (${endGrid.row},${endGrid.col})`);
-        console.warn(`[GridPathfinder] Start passable: ${this.isPassable(startGrid.row, startGrid.col)}, End passable: ${this.isPassable(endGrid.row, endGrid.col)}`);
-        console.warn('[GridPathfinder] Sampling cells between start and end:');
+        // console.warn(`[GridPathfinder] No path found from (${startGrid.row},${startGrid.col}) to (${endGrid.row},${endGrid.col})`);
+        // console.warn(`[GridPathfinder] Start passable: ${this.isPassable(startGrid.row, startGrid.col)}, End passable: ${this.isPassable(endGrid.row, endGrid.col)}`);
+        // console.warn('[GridPathfinder] Sampling cells between start and end:');
         for (let i = 0; i <= 4; i++) {
           const t = i / 4;
           const sampleRow = Math.round(startGrid.row + (endGrid.row - startGrid.row) * t);
           const sampleCol = Math.round(startGrid.col + (endGrid.col - startGrid.col) * t);
           const cell = this.gridManager.getCell(sampleRow, sampleCol);
-          console.warn(`  (${sampleRow},${sampleCol}):`, cell?.zoneType, 'passable:', cell?.passable);
+          // console.warn(`  (${sampleRow},${sampleCol}):`, cell?.zoneType, 'passable:', cell?.passable);
         }
       }
       // Emit pathCalculated event with failure (silent unless subscribed)
@@ -101,7 +101,7 @@ export class GridPathfinder extends BaseManager {
     }
 
     if (DEBUG_PATHFIND) {
-      console.log(`[GridPathfinder] Path found with ${path.length} grid cells`);
+      // console.log(`[GridPathfinder] Path found with ${path.length} grid cells`);
     }
 
     // Convert grid path to GridPathCells with world coordinates
@@ -184,7 +184,7 @@ export class GridPathfinder extends BaseManager {
       if (current === endKey) {
         // Reconstruct path
         if (DEBUG_PATHFIND) {
-          console.log(`[GridPathfinder] Path found! Explored ${exploredCount} cells in ${iterations} iterations`);
+          // console.log(`[GridPathfinder] Path found! Explored ${exploredCount} cells in ${iterations} iterations`);
         }
         return this.reconstructPath(cameFrom, current);
       }
@@ -238,11 +238,11 @@ export class GridPathfinder extends BaseManager {
           const fromCell = this.gridManager.getCell(currentRow, currentCol);
           const toCell = this.gridManager.getCell(neighbor.row, neighbor.col);
           if (DEBUG_PATHFIND) {
-            console.warn(`[GridPathfinder][REJECTED] Step from (${currentRow},${currentCol}) to (${neighbor.row},${neighbor.col}) blocked.`, {
-              fromZone: fromCell?.zoneType, toZone: toCell?.zoneType,
-              fromAllowedOutgoing: fromCell?.allowedOutgoing, toAllowedIncoming: toCell?.allowedIncoming,
-              fromPassable: fromCell?.passable, toPassable: toCell?.passable
-            });
+            // console.warn(`[GridPathfinder][REJECTED] Step from (${currentRow},${currentCol}) to (${neighbor.row},${neighbor.col}) blocked.`, {
+            //   fromZone: fromCell?.zoneType, toZone: toCell?.zoneType,
+            //   fromAllowedOutgoing: fromCell?.allowedOutgoing, toAllowedIncoming: toCell?.allowedIncoming,
+            //   fromPassable: fromCell?.passable, toPassable: toCell?.passable
+            // });
           }
           continue;
         }
@@ -265,10 +265,10 @@ export class GridPathfinder extends BaseManager {
     // No path found
     if (DEBUG_PATHFIND) {
       if (iterations >= maxIterations) {
-        console.warn(`[GridPathfinder] Max iterations reached! Start: (${startRow},${startCol}), End: (${endRow},${endCol})`);
+        // console.warn(`[GridPathfinder] Max iterations reached! Start: (${startRow},${startCol}), End: (${endRow},${endCol})`);
       } else {
-        console.warn(`[GridPathfinder] OpenSet exhausted after ${iterations} iterations, explored ${exploredCount} cells`);
-        console.warn(`[GridPathfinder] ClosedSet size: ${closedSet.size}, never reached end goal`);
+        // console.warn(`[GridPathfinder] OpenSet exhausted after ${iterations} iterations, explored ${exploredCount} cells`);
+        // console.warn(`[GridPathfinder] ClosedSet size: ${closedSet.size}, never reached end goal`);
       }
     }
     return [];
@@ -302,13 +302,13 @@ export class GridPathfinder extends BaseManager {
         const isAxisAligned = (rowDiff === 1 && colDiff === 0) || (rowDiff === 0 && colDiff === 1);
         
         if (!isAxisAligned) {
-          console.error(`[GridPathfinder] Non-axis-aligned step detected: (${from.row},${from.col}) -> (${to.row},${to.col})`);
+          // console.error(`[GridPathfinder] Non-axis-aligned step detected: (${from.row},${from.col}) -> (${to.row},${to.col})`);
         }
         
         // Assert directional passability
         const isDirectionallyLegal = this.gridManager.isPassableDirection(from.row, from.col, to.row, to.col);
         if (!isDirectionallyLegal) {
-          console.error(`[GridPathfinder] Illegal directional step: (${from.row},${from.col}) -> (${to.row},${to.col})`);
+          // console.error(`[GridPathfinder] Illegal directional step: (${from.row},${from.col}) -> (${to.row},${to.col})`);
         }
       }
     }
