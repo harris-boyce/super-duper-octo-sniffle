@@ -27,18 +27,29 @@ pnpm install
 
 ### Environment Setup
 
-Copy `.env.example` to `.env` and add your Claude API key:
+The app uses serverless functions to securely proxy Claude API calls. API keys are stored server-side only.
 
+**For Local Development:**
+
+1. Copy `.env.example` to `.env.local`:
 ```bash
-cp .env.example .env
+cp .env.example .env.local
 ```
 
-Edit `.env` and add your API credentials:
+2. Add your Anthropic API key to `.env.local`:
+```
+ANTHROPIC_API_KEY=your_actual_api_key_here
+ANTHROPIC_API_URL=https://api.anthropic.com/v1/messages
+```
 
-```
-VITE_CLAUDE_API_KEY=your_actual_api_key_here
-VITE_ANTHROPIC_API_URL=https://api.anthropic.com/v1/messages
-```
+**For Production (Vercel):**
+
+Set environment variables in the Vercel dashboard:
+- `ANTHROPIC_API_KEY` - Your Anthropic API key
+- `ANTHROPIC_API_URL` - (Optional) Defaults to `https://api.anthropic.com/v1/messages`
+- `ADMIN_API_KEY` - Secure key for admin dashboard access
+
+📖 **See [DEPLOYMENT.md](./DEPLOYMENT.md) for complete deployment instructions.**
 
 ### Development
 
@@ -60,6 +71,27 @@ pnpm run build
 pnpm run type-check
 ```
 
+## 🎯 Mascot System
+
+The game features an interactive Mascot T-Shirt Cannon system that allows players to re-engage disinterested fans and boost wave participation through strategic targeting and cascading ripple effects.
+
+**Key Features:**
+- **Smart Targeting AI**: Automatically prioritizes struggling fans (3x weight)
+- **Ripple Effects**: Spatial spread of engagement boost to nearby fans
+- **Wave Integration**: 10-20% participation improvement typical
+- **Visual Feedback**: Particle effects, targeting indicators, re-engagement animations
+- **Analytics Tracking**: Real-time impact measurement and reporting
+
+**Controls:**
+- `M` - Activate mascot
+- `1-4` - Assign to specific section
+- `A` - Toggle auto-rotation mode
+
+**Documentation:**
+- 📚 [MASCOT_SYSTEM.md](./docs/MASCOT_SYSTEM.md) - Complete system documentation
+- 🧪 [MANUAL_TESTING.md](./MANUAL_TESTING.md) - Testing guide with Playwright examples
+- 📊 [TESTING_STRATEGY.md](./docs/TESTING_STRATEGY.md) - Test coverage and approach
+
 ## 📁 Project Structure
 
 ```
@@ -76,15 +108,28 @@ apps/stadium-simulator/
 │   ├── sprites/             # Game entities
 │   │   ├── Fan.ts          # Fan sprite with wave mechanics
 │   │   ├── Vendor.ts       # Vendor sprite
-│   │   └── Mascot.ts       # Mascot sprite
+│   │   └── Mascot.ts       # Mascot sprite with cannon
+│   ├── systems/             # Game systems
+│   │   ├── MascotTargetingAI.ts      # Smart fan targeting
+│   │   ├── RipplePropagationEngine.ts # Spatial effect spread
+│   │   └── MascotAnalytics.ts        # Impact tracking
+│   ├── components/          # Visual components
+│   │   ├── CatchParticles.ts      # Particle effects
+│   │   └── TargetingIndicator.ts  # UI feedback
 │   ├── types/              # TypeScript definitions
 │   │   └── GameTypes.ts    # Game state interfaces
+│   ├── config/             # Configuration
+│   │   └── gameBalance.ts  # All tunable parameters
 │   ├── config.ts           # Phaser configuration
 │   └── main.ts             # Entry point
+├── docs/                   # Documentation
+│   ├── MASCOT_SYSTEM.md   # Mascot system guide
+│   ├── TESTING_STRATEGY.md # Test approach
+│   └── RIPPLE_ENGINE.md   # Ripple system API
 ├── public/
 │   └── assets/
-│       ├── sprites/        # Sprite sheets (placeholder)
-│       └── sounds/         # 8-bit audio files (placeholder)
+│       ├── sprites/        # Sprite sheets
+│       └── sounds/         # 8-bit audio files
 ├── .github/workflows/
 │   └── deploy.yml          # Auto-deploy to GitHub Pages
 └── index.html              # HTML entry point
@@ -101,13 +146,73 @@ apps/stadium-simulator/
 
 ## 🤖 AI Integration
 
-The `AnnouncerService` class integrates with Claude API to generate dynamic, context-aware stadium announcer commentary:
+The `AnnouncerService` class integrates with Claude API via a secure serverless function to generate dynamic, context-aware stadium announcer commentary:
 
 ```typescript
 const announcer = new AnnouncerService();
 const commentary = await announcer.getCommentary('Wave starting in section 3!');
 // Returns: "Ladies and gentlemen, here it comes! Section 3 is ready to GO!"
 ```
+
+### AI Configuration System
+
+The game includes a comprehensive AI configuration system for managing AI-generated content:
+
+- **Epoch-based Content Rotation**: Deterministic content generation based on timestamps
+- **Cost Tracking & Budget Enforcement**: Prevents runaway API costs with configurable limits
+- **Personality Types**: Complete TypeScript interfaces for vendors, mascots, and announcers
+- **Content Caching**: Efficient reuse of AI-generated content within epochs
+
+📖 **[Read the AI Configuration Guide](docs/AI_CONFIGURATION.md)** for detailed documentation on:
+- Epoch system configuration and usage
+- Cost management best practices
+- Personality type system reference
+- Content generation workflow examples
+
+### Serverless API
+
+The `/api/announcer` endpoint provides secure proxy access to Claude API with:
+- **Rate Limiting**: 10 requests per minute per IP address
+- **Secure Keys**: API keys stored server-side only (never exposed to client)
+- **Input Validation**: Validates and sanitizes all requests
+- **CORS Support**: Configured for cross-origin requests
+- **Error Handling**: Graceful fallbacks for API failures
+
+## 🧪 Testing
+
+The project uses Vitest for comprehensive unit and integration testing.
+
+### Running Tests
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode
+npm test -- --watch
+
+# Run with coverage report
+npm test -- --coverage
+
+# Run specific test file
+npm test -- WaveManager
+
+# Run with UI
+npm run test:ui
+```
+
+### Test Coverage
+
+- **490+ tests passing** across mascot system and core game logic
+- **Unit Tests**: RipplePropagationEngine, MascotAnalytics, WaveManager, MascotTargetingAI
+- **Component Tests**: CatchParticles, TargetingIndicator, Fan behaviors
+- **MVP Coverage**: ~75-80% for mascot system components
+
+### Documentation
+
+- 📊 [TESTING_STRATEGY.md](./docs/TESTING_STRATEGY.md) - Test approach and coverage
+- 🧪 [MANUAL_TESTING.md](./MANUAL_TESTING.md) - Manual testing checklist
+- 📈 [TEST_BASELINE.md](./docs/TEST_BASELINE.md) - Test status baseline
 
 ## 🎨 Game Configuration
 
@@ -130,7 +235,24 @@ const commentary = await announcer.getCommentary('Wave starting in section 3!');
 
 ## 🚢 Deployment
 
-The project automatically deploys to GitHub Pages when changes are pushed to the `main` branch:
+### Vercel (Recommended)
+
+The project is configured for Vercel deployment with serverless functions:
+
+```bash
+npm run vercel:deploy
+```
+
+Or link and deploy automatically:
+1. Install Vercel CLI: `npm install -g vercel`
+2. Run `vercel` in the project directory
+3. Set environment variables in Vercel dashboard:
+   - `ANTHROPIC_API_KEY`
+   - `ANTHROPIC_API_URL` (optional)
+
+### GitHub Pages
+
+The project can also deploy to GitHub Pages (static assets only, no serverless functions):
 
 - **Live URL**: `https://<username>.github.io/stadium-simulator/`
 - **Workflow**: `.github/workflows/deploy.yml`
@@ -138,9 +260,43 @@ The project automatically deploys to GitHub Pages when changes are pushed to the
 
 ## 🔒 Security
 
-- Uses Axios 1.12.0 to patch known vulnerabilities
-- API keys stored in environment variables (not committed to git)
-- Vite environment variable prefix: `VITE_`
+- **Serverless API Proxy**: Claude API keys never exposed to client-side code
+- **Rate Limiting**: Built-in protection against API abuse (10 req/min per IP)
+- **Input Validation**: All requests validated and sanitized
+- **Environment Variables**: API keys stored securely server-side
+- **CORS Protection**: Configured for secure cross-origin requests
+
+## 📚 Documentation
+
+Comprehensive documentation is available in the `docs/` directory:
+
+- **[AI_SYSTEM.md](./docs/AI_SYSTEM.md)** - Complete AI system documentation
+  - Architecture overview with diagrams
+  - Developer guide for adding archetypes and content types
+  - Designer guide for writing effective prompts
+  - Configuration reference
+  - API reference with examples
+  - Troubleshooting guide
+  - Cost analysis and projections
+
+- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Production deployment checklist
+  - Pre-deployment verification
+  - Step-by-step deployment instructions
+  - Post-deployment validation
+  - Rollback procedures
+  - Ongoing maintenance tasks
+
+- **[AI_CONFIGURATION.md](./docs/AI_CONFIGURATION.md)** - Detailed AI config reference
+- **[API_GENERATE_CONTENT.md](./docs/API_GENERATE_CONTENT.md)** - API implementation details
+- **[CONTENT_GENERATION_GUIDE.md](./docs/CONTENT_GENERATION_GUIDE.md)** - Content creation tips
+
+### Admin Dashboard
+
+Access the cost monitoring dashboard at `/admin.html`:
+- Real-time usage and cost tracking
+- Endpoint-specific statistics
+- Epoch-based cost breakdown
+- Requires ADMIN_API_KEY for authentication
 
 ## 📝 Development Status
 

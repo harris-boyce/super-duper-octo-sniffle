@@ -1,0 +1,357 @@
+import Phaser from 'phaser';
+import { SectionConfig } from '@/managers/interfaces/Section';
+import { gameBalance } from '@/config/gameBalance';
+import type { Fan } from './Fan';
+import type { SeatActor } from './Seat';
+
+/**
+ * StadiumSection is a container sprite that manages:
+ * - Rendering graduated stripe backgrounds with gradient dividers
+ * - Population and management of 32 fan sprites (4 rows × 8 columns)
+ * - Visual effects (wave animations, flash effects, particle bursts)
+ * - Vendor placement indicators
+ */
+export class StadiumSection extends Phaser.GameObjects.Container {
+  private sectionId: string;
+  private sectionWidth: number;
+  private sectionHeight: number;
+  private config: SectionConfig;
+  private rows: Array<{
+    rowIndex: number;
+    seats: SeatActor[];
+    getSeats(): SeatActor[];
+    getFans(): Fan[];
+    updateFanIntensity(value: number): void;
+  }> = [];
+  private waveColumnStates: Map<number, 'success' | 'sputter' | 'death'> = new Map();
+  private expectedColumnCount: number = 0;
+  private currentWaveActive: boolean = false;
+
+  constructor(
+    scene: Phaser.Scene,
+    x: number,
+    y: number,
+    config: SectionConfig,
+    sectionId: string
+  ) {
+    super(scene, x, y);
+    this.sectionId = sectionId;
+    this.sectionWidth = config.width;
+    this.sectionHeight = config.height;
+    this.config = {
+      rowCount: config.rowCount ?? 4,
+      seatsPerRow: config.seatsPerRow ?? 8,
+      width: config.width,
+      height: config.height,
+      rowBaseHeightPercent: config.rowBaseHeightPercent ?? 0.15,
+      startLightness: Math.max(30, Math.min(90, config.startLightness ?? 62)),
+      autoPopulate: config.autoPopulate ?? true,
+    };
+    this.expectedColumnCount = config.seatsPerRow ?? 8;
+
+    this.initializeRows(scene);
+    scene.add.existing(this);
+  }
+
+  /**
+   * Get the section ID
+   */
+  public getId(): string {
+    return this.sectionId;
+  }
+
+  /**
+   * Get the bounding box of the section for perimeter calculations
+   * Returns absolute coordinates based on container position
+   */
+  public getSectionBounds(): { left: number; right: number; top: number; bottom: number } {
+    return {
+      left: this.x - this.sectionWidth / 2,
+      right: this.x + this.sectionWidth / 2,
+      top: this.y - this.sectionHeight / 2,
+      bottom: this.y + this.sectionHeight / 2,
+    };
+  }
+
+  /**
+   * Get the section's width
+   */
+  public getWidth(): number {
+    return this.sectionWidth;
+  }
+
+  /**
+   * Get the section's height
+   */
+  public getHeight(): number {
+    return this.sectionHeight;
+  }
+
+  /**
+   * Initializes SectionRow objects and adds them to the container
+   * TODO: This will be replaced by SectionRowActor initialization in SectionActor
+   */
+  private initializeRows(scene: Phaser.Scene): void {
+    const rowCount = this.config.rowCount ?? 4;
+    const seatsPerRow = this.config.seatsPerRow ?? 8;
+    
+    // Stub: Create empty row structures
+    // Real row/seat creation happens in SectionActor.populateFromData()
+    for (let i = 0; i < rowCount; i++) {
+      this.rows.push({
+        rowIndex: i,
+        seats: [],
+        getSeats: () => this.rows[i]?.seats || [],
+        getFans: () => this.rows[i]?.seats.map(s => s.getFan()).filter((f): f is Fan => f !== null) || [],
+        updateFanIntensity: (value: number) => {
+          this.rows[i]?.seats.forEach(seat => {
+            const fan = seat.getFan();
+            if (fan) fan.setIntensity(value);
+          });
+        }
+      });
+    }
+  }
+
+  /**
+   * Get all SectionRow objects
+   */
+  public getRows(): Array<{
+    rowIndex: number;
+    seats: SeatActor[];
+    getSeats(): SeatActor[];
+    getFans(): Fan[];
+    updateFanIntensity(value: number): void;
+  }> {
+    return this.rows;
+  }
+
+  public getColumnCount() :number {
+    return this.getRows().reduce((max, row) => Math.max(max, row.seats.length), 0);
+  }
+
+  /**
+   * Gets all fans in this section
+   */
+  public getFans(): any[] {
+    return this.rows.flatMap(row => row.getFans());
+  }
+
+  /**
+   * Gets fans in a specific row
+   */
+  public getFanRow(rowIndex: number): any[] {
+    if (this.rows[rowIndex]) {
+      return this.rows[rowIndex].getFans();
+    }
+    return [];
+  }
+
+  /**
+   * @deprecated Use SectionActor.getSectionWaveBonus() instead.
+   * Calculate section bonus for individual fan wave participation.
+   * Higher happiness and attention, lower thirst = higher bonus.
+   */
+  public getSectionWaveBonus(): number {
+    // Temporary delegation for backwards compatibility
+    // This will be removed once all callers use SectionActor
+    const allFans = this.getFans();
+    if (allFans.length === 0) {
+      return 0;
+    }
+    let totalHappiness = 0;
+    let totalThirst = 0;
+    let totalAttention = 0;
+    for (const fan of allFans) {
+      const stats = fan.getStats();
+      totalHappiness += stats.happiness;
+      totalThirst += stats.thirst;
+      totalAttention += stats.attention;
+    }
+    const happiness = totalHappiness / allFans.length;
+    const thirst = totalThirst / allFans.length;
+    const attention = totalAttention / allFans.length;
+    return (happiness * 0.2 + attention * 0.2) - (thirst * 0.15);
+  }
+
+  /**
+   * @deprecated Use SectionActor.updateFanIntensity() instead.
+   * Temporary delegation for backwards compatibility.
+   */
+  public updateFanIntensity(intensity?: number): void {
+    // Deprecated: visual intensity now handled by SectionActor
+    if (intensity !== undefined) {
+      this.rows.forEach(row => row.updateFanIntensity(intensity));
+    }
+  }
+
+  /**
+   * Get all disinterested fans in this section
+   * @returns Array of fans that are disinterested
+   */
+  public getDisinterestedFans(): Fan[] {
+    return this.getFans().filter(fan => fan.getIsDisinterested());
+  }
+
+  /**
+   * Get count of disinterested fans in this section
+   * @returns Number of disinterested fans
+   */
+  public getDisinterestedCount(): number {
+    return this.getDisinterestedFans().length;
+  }
+
+  /**
+   * Get percentage of disinterested fans in this section
+   * @returns Percentage of disinterested fans (0-100)
+   */
+  public getDisinterestedPercentage(): number {
+    const total = this.getFans().length;
+    return total > 0 ? (this.getDisinterestedCount() / total) * 100 : 0;
+  }
+
+  /**
+   * @deprecated Use SectionActor.resetFanWaveState() instead.
+   * Temporary delegation for backwards compatibility.
+   */
+  public resetFanWaveState(): void {
+    // Deprecated: handled by SectionActor.resetFanWaveState()
+  }
+
+  /**
+   * @deprecated Use SectionActor.calculateColumnParticipation() instead.
+   * Temporary delegation for backwards compatibility.
+   */
+  public calculateColumnParticipation(
+    columnIndex: number,
+    waveStrength: number
+  ): Array<{ fan: Fan; willParticipate: boolean; intensity: number }> {
+    // Deprecated: use SectionActor.calculateColumnParticipation()
+    return [];
+  }
+
+  /**
+   * @deprecated Use SectionActor.playColumnAnimation() instead.
+   * Temporary delegation for backwards compatibility.
+   */
+  public async playColumnAnimation(
+    columnIndex: number,
+    fanStates: Array<{ fan: Fan; willParticipate: boolean; intensity: number }>,
+    visualState: 'full' | 'sputter' | 'death' = 'full',
+    waveStrength: number = 70
+  ): Promise<void> {
+    // Deprecated: use SectionActor.playColumnAnimation()
+  }
+
+  /**
+   * Plays wave animation for all fans with column-based stagger
+   * Now tracks individual fan participation (kept for backwards compatibility)
+   */
+  public async playWave(): Promise<{ participatingFans: number; totalFans: number; participationRate: number }> {
+    // Deprecated: SectionActor orchestrates waves now
+    return { participatingFans: 0, totalFans: 0, participationRate: 0 };
+  }
+
+  /**
+   * Play a named animation on this section
+   * @param animationName - The name of the animation ('flash-success', 'flash-fail', etc.)
+   * @param options - Optional parameters for the animation
+   */
+  public playAnimation(animationName: string, options?: Record<string, any>): Promise<void> | void {
+    switch (animationName) {
+      case 'flash-success':
+        return this.flashSuccess();
+      
+      case 'flash-fail':
+        return this.flashFail();
+      
+      default:
+        console.warn(`Unknown animation '${animationName}' for StadiumSection`);
+        return Promise.resolve();
+    }
+  }
+
+  /**
+   * Flash the border of the section green after all fans have played their animation
+   */
+  public async flashSuccess(): Promise<void> {
+    return new Promise(resolve => {
+      // Create particle burst at section center
+      this.createParticleBurst(0x00ff00);
+
+      // Delay flash until all fans have played their animation
+      // (Assume playWave is called before this and awaited)
+      const border = this.scene.add.rectangle(this.x, this.y, this.sectionWidth + 8, this.sectionHeight + 8);
+      border.setStrokeStyle(6, 0x00ff00, 0.95);
+      border.setDepth(9999);
+      this.scene.tweens.add({
+        targets: border,
+        alpha: { from: 0.95, to: 0 },
+        duration: 350,
+        onComplete: () => {
+          border.destroy();
+          resolve();
+        }
+      });
+    });
+  }
+
+  /**
+   * Flash the border of the section red after all fans have played their animation
+   */
+  public async flashFail(): Promise<void> {
+    return new Promise(resolve => {
+      // Create particle burst at section center
+      this.createParticleBurst(0xff0000);
+
+      // Delay flash until all fans have played their animation
+      // (Assume playWave is called before this and awaited)
+      const border = this.scene.add.rectangle(this.x, this.y, this.sectionWidth + 8, this.sectionHeight + 8);
+      border.setStrokeStyle(6, 0xff0000, 0.95);
+      border.setDepth(9999);
+      this.scene.tweens.add({
+        targets: border,
+        alpha: { from: 0.95, to: 0 },
+        duration: 350,
+        onComplete: () => {
+          border.destroy();
+          resolve();
+        }
+      });
+    });
+  }
+
+  /**
+   * Show vendor placed indicator (if needed)
+   */
+  public placedVendor(vendorId: number): void {
+    // Placeholder for vendor indicator
+    // Could add a text or icon to show vendor is here
+  }
+
+  /**
+   * Creates a particle burst effect at the section center
+   */
+  private createParticleBurst(color: number): void {
+    const particleCount = 20;
+    for (let i = 0; i < particleCount; i++) {
+      const angle = (Math.PI * 2 * i) / particleCount;
+      const speed = 100 + Math.random() * 50;
+
+      const particle = this.scene.add.circle(this.x, this.y, 4, color);
+
+      this.scene.tweens.add({
+        targets: particle,
+        x: this.x + Math.cos(angle) * speed,
+        y: this.y + Math.sin(angle) * speed,
+        alpha: 0,
+        scale: 0,
+        duration: 600,
+        ease: 'Power2',
+        onComplete: () => {
+          particle.destroy();
+        }
+      });
+    }
+  }
+}

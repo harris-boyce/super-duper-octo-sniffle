@@ -1,0 +1,197 @@
+/**
+ * Performance Benchmark Tests for Mascot System
+ *
+ * STATUS: STUBBED - Not implemented in MVP
+ * PRIORITY: Medium
+ * EFFORT: 1 day
+ *
+ * These tests validate performance targets defined in Issue #62:
+ * - Targeting AI: <2ms per shot
+ * - Ripple calculation: <5ms for 200-fan section
+ * - Visual effects: 55fps+ with 5 simultaneous mascots
+ * - Memory: No leaks from particles, tweens, or analytics
+ * - Total mascot activation overhead: <20ms per activation
+ *
+ * To implement:
+ * 1. Remove .stub extension
+ * 2. Implement test bodies
+ * 3. Run: npm test -- mascot-performance
+ */
+
+import { describe, it, expect, beforeEach } from 'vitest';
+// import { MascotTargetingAI } from '@/systems/MascotTargetingAI';
+// import { RipplePropagationEngine } from '@/systems/RipplePropagationEngine';
+// import { Mascot } from '@/sprites/Mascot';
+
+describe.skip('Mascot Performance Benchmarks', () => {
+  /**
+   * TODO: Test targeting AI performance
+   * Target: <2ms per shot with 200-fan section
+   *
+   * Implementation:
+   * 1. Create section with 200 fans
+   * 2. Run 100 iterations of selectCatchingFans
+   * 3. Measure average time
+   * 4. Assert avg < 2ms
+   */
+  it('targeting AI completes in <2ms', () => {
+    // const ai = new MascotTargetingAI();
+    // const section = createLargeSection(200);
+    // const iterations = 100;
+    //
+    // const start = performance.now();
+    // for (let i = 0; i < iterations; i++) {
+    //   ai.reset();
+    //   ai.selectCatchingFans(section, 0.5);
+    // }
+    // const duration = performance.now() - start;
+    // const avgTime = duration / iterations;
+    //
+    // expect(avgTime).toBeLessThan(2);
+  });
+
+  /**
+   * TODO: Test ripple propagation performance
+   * Target: <5ms for 200-fan section
+   *
+   * Implementation:
+   * 1. Create section with 200 fans (10x20 grid)
+   * 2. Run 100 iterations of calculateRipple
+   * 3. Measure average time
+   * 4. Assert avg < 5ms
+   */
+  it('ripple calculation completes in <5ms for 200 fans', () => {
+    // const engine = new RipplePropagationEngine();
+    // const section = createLargeSection(200);
+    // const epicenter = section.getFans()[100];
+    // const iterations = 100;
+    //
+    // const start = performance.now();
+    // for (let i = 0; i < iterations; i++) {
+    //   engine.calculateRipple(epicenter, section);
+    // }
+    // const duration = performance.now() - start;
+    // const avgTime = duration / iterations;
+    //
+    // expect(avgTime).toBeLessThan(5);
+  });
+
+  /**
+   * TODO: Test visual effects performance
+   * Target: Maintain 55fps+ with 5 simultaneous mascots
+   *
+   * Implementation:
+   * 1. Create real Phaser scene
+   * 2. Spawn 5 mascots
+   * 3. Activate all simultaneously
+   * 4. Monitor FPS during particle bursts
+   * 5. Assert FPS stays above 55
+   *
+   * Note: Requires real Phaser environment, may need E2E test
+   */
+  it('visual effects maintain 55fps+ with 5 mascots', () => {
+    // const scene = createRealScene();
+    // const mascots = createMultipleMascots(5);
+    //
+    // activateAllMascots(mascots);
+    //
+    // const fps = monitorFPS(duration: 20000);
+    //
+    // expect(fps.min).toBeGreaterThan(55);
+    // expect(fps.avg).toBeGreaterThan(58);
+  });
+
+  /**
+   * TODO: Test memory leak detection
+   * Target: No leaks from particles, tweens, or analytics
+   *
+   * Implementation:
+   * 1. Measure baseline memory
+   * 2. Run 100 mascot activation cycles
+   * 3. Force garbage collection
+   * 4. Measure final memory
+   * 5. Assert memory growth < 5MB
+   */
+  it('no memory leaks from repeated activations', () => {
+    // const scene = createRealScene();
+    // const mascot = new Mascot(scene, 0, 0);
+    // const section = createSection();
+    //
+    // const baselineMemory = getMemoryUsage();
+    //
+    // for (let i = 0; i < 100; i++) {
+    //   mascot.activateInSection(section);
+    //   waitForDeactivation(mascot);
+    // }
+    //
+    // forceGarbageCollection();
+    // const finalMemory = getMemoryUsage();
+    //
+    // const growth = finalMemory - baselineMemory;
+    // expect(growth).toBeLessThan(5 * 1024 * 1024); // 5MB
+  });
+
+  /**
+   * TODO: Test total activation overhead
+   * Target: <20ms total (excluding visual delays)
+   *
+   * Implementation:
+   * 1. Create mascot with real scene
+   * 2. Time full activation sequence
+   * 3. Subtract visual delays (1s targeting + 1s flight)
+   * 4. Assert logic overhead < 20ms
+   */
+  it('full activation overhead <20ms', () => {
+    // const scene = createRealScene();
+    // const mascot = new Mascot(scene, 0, 0);
+    // const section = createSection();
+    //
+    // const start = performance.now();
+    // mascot.activateInSection(section);
+    // mascot.fireCannonShot(); // Immediate, no delay
+    // const duration = performance.now() - start;
+    //
+    // expect(duration).toBeLessThan(20);
+  });
+
+  /**
+   * TODO: Test section size scaling
+   * Verify performance scales linearly with section size
+   *
+   * Test Cases:
+   * - 50 fans: <1ms targeting, <2ms ripple
+   * - 100 fans: <1.5ms targeting, <3ms ripple
+   * - 200 fans: <2ms targeting, <5ms ripple
+   * - 500 fans: <4ms targeting, <10ms ripple
+   */
+  it('performance scales linearly with section size', () => {
+    // const sizes = [50, 100, 200, 500];
+    // const results = sizes.map(size => {
+    //   const section = createSection(size);
+    //   return {
+    //     size,
+    //     targetingTime: benchmarkTargeting(section),
+    //     rippleTime: benchmarkRipple(section)
+    //   };
+    // });
+    //
+    // // Verify linear scaling (time ≈ size * constant)
+    // const targetingSlope = linearRegression(results.map(r => [r.size, r.targetingTime]));
+    // const rippleSlope = linearRegression(results.map(r => [r.size, r.rippleTime]));
+    //
+    // expect(targetingSlope.r2).toBeGreaterThan(0.95); // Good linear fit
+    // expect(rippleSlope.r2).toBeGreaterThan(0.95);
+  });
+});
+
+/**
+ * Helper Functions (to be implemented)
+ */
+
+// function createLargeSection(fanCount: number) { /* ... */ }
+// function createRealScene() { /* ... */ }
+// function createMultipleMascots(count: number) { /* ... */ }
+// function monitorFPS(duration: number) { /* ... */ }
+// function getMemoryUsage() { /* ... */ }
+// function forceGarbageCollection() { /* ... */ }
+// function linearRegression(points: number[][]) { /* ... */ }

@@ -1,5 +1,11 @@
 import Phaser from 'phaser';
 import { config } from './config';
+import { initDevPanel } from './ui/DevPanel';
 
-// Game initialization - scenes auto-loaded from config
-new Phaser.Game(config);
+// Initialize dev panel (only in development mode)
+initDevPanel();
+
+// Create game instance
+// Note: Demo mode scene selection is now handled in config.ts
+const game = new Phaser.Game(config);
+

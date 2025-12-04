@@ -5,24 +5,38 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:full": "vercel dev",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
     "test": "vitest",
+    "test:api": "vitest --config vitest.api.config.ts",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest --coverage"
+    "test:coverage": "vitest --coverage",
+    "test:watch": "vitest --watch",
+    "test:mascot": "vitest --run --reporter=verbose src/__tests__/systems/RipplePropagationEngine src/__tests__/systems/MascotTargetingAI src/__tests__/systems/MascotAnalytics src/__tests__/components/CatchParticles src/__tests__/components/TargetingIndicator src/__tests__/managers/WaveManager",
+    "test:integration": "vitest --run src/__tests__/integration",
+    "audit:security": "./scripts/security-audit.sh",
+    "vercel:dev": "vercel dev",
+    "vercel:deploy": "vercel --prod",
+    "deploy:itch": "pnpm run build && butler push dist $ITCH_ACCOUNT/$ITCH_PROJECT:html5 --userversion $(git rev-parse --short HEAD)"
   },
   "dependencies": {
     "axios": "^1.7.9",
     "howler": "^2.2.4",
-    "phaser": "^3.80.1"
+    "phaser": "^3.80.1",
+    "idb": "^8.0.3"
   },
   "devDependencies": {
-    "@types/node": "^20.14.9",
+    "@types/node": "^20.19.25",
+    "@vercel/node": "^5.5.5",
     "@vitest/coverage-v8": "^4.0.8",
     "@vitest/ui": "^4.0.8",
     "happy-dom": "^20.0.10",
+    "node-mocks-http": "^1.17.2",
+    "phaser3spectorjs": "^0.0.8",
     "typescript": "^5.5.2",
+    "vercel": "^48.9.0",
     "vite": "^5.3.1",
     "vitest": "^4.0.8"
   }
