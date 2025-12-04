@@ -255,86 +255,79 @@ Safeguards:
 
 ---
 
-### 4.3 Wire T-Shirt Cannon Stat Application & Attention Economy
-**Files**: `MascotBehavior.ts`, `MascotActor.ts`, `StadiumScene.ts`
+### 4.3 Wire T-Shirt Cannon Stat Application & Attention Economy ✅
+**Files**: `MascotBehavior.ts`, `MascotActor.ts`, `StadiumScene.ts`, `FanActor.ts`, `Fan.ts`
 
-- [ ] Connect `tShirtCannonHit` event listener in StadiumScene
-- [ ] Query fans at hit position via ActorRegistry (within ripple radius)
-- [ ] Apply stat changes from `gameBalance.mascotBehavior.abilityEffects`:
+- ✅ Connected `tShirtCannonHit` event listener in StadiumScene
+- ✅ Query fans at hit position via ActorRegistry (within ripple radius of 3 cells)
+- ✅ Apply stat changes via `FanActor.applyTShirtCannonEffect()`:
   - Happiness: +3 (boost fan happiness)
   - Attention: -2 (drain from fan, add to mascot bank)
-- [ ] Accumulate drained attention to mascot `attentionBank` (0-100, clamped)
-- [ ] Visual reaction: fans jump and jitter when hit by ripple
-- [ ] Add getter `getAttentionBank()` for UI queries (already exists ✅)
+- ✅ Accumulate drained attention to mascot `attentionBank` (0-100, clamped)
+- ✅ Visual reaction: fans bounce, jitter, and wobble with ripple effect
+  - Multiple bounces (up-down-up-down)
+  - Horizontal jitter (left-right)
+  - Random rotational wobble (-5° to +5°, randomized per fan)
+- ✅ Distance-based intensity falloff (1.5 at epicenter, 0.5 at edge)
+- ✅ Ripple propagation delay (150ms per cell) for wave effect
+- ✅ Properly follows actor pattern: Event → FanActor → Fan sprite
 
 **Note**: Mascot increases happiness at the COST of fan attention. He drains attention from fans and stores it in his ultimate bank.
 
 **Verification**:
-- Fans gain happiness on t-shirt hit
-- Fan attention drains to mascot bank
-- Bank accumulates correctly (clamped 0-100)
-- Fans visibly react (jump/jitter) when hit
+- ✅ Fans gain happiness on t-shirt hit
+- ✅ Fan attention drains to mascot bank
+- ✅ Bank accumulates correctly (clamped 0-100)
+- ✅ Fans visibly react with distance-based intensity
+- ✅ Ripple effect propagates outward organically
 
 ---
 
-### 4.4 Implement Ultimate Ability
+### 4.4 Implement Ultimate Ability ✅
 **Files**: `MascotBehavior.ts`, `MascotActor.ts`, `StadiumScene.ts`
 
-- [ ] Add `ultimateReady` computed property (true when `attentionBank >= 30`)
-- [ ] Implement `fireUltimate(sectionId)` method:
-  - Target count × 2 (hit more fans)
-  - Apply `ultimateStatBoosts` (attention +8, happiness +4)
-  - Ripple radius × 1.5
+- ✅ Add `ultimateReady` computed property (true when `attentionBank >= 30`)
+- ✅ Implement `fireUltimate(scene, sections, ultimatePower)` method:
+  - Fires at all three sections (A, B, C)
+  - Enhanced ripple effect (1.5x radius multiplier)
   - Stadium white flash (depth 400, alpha 0.3, 200ms fade)
-  - Drain attention bank to 0
-- [ ] Wire ultimate button click in `setupMascotControlListeners()`
+  - Drains attention bank to 0
+  - Emits `crowdGoesWild` event with intensity proportional to power
+- ✅ Wire ultimate button click in `setupMascotControlListeners()`
+- ✅ Stadium-wide "crowd goes wild" animation:
+  - All fans react with random delays (0-500ms)
+  - Intensity scales: 30p → 0.5 intensity (16px), 100p → 1.5 intensity (48px)
+  - Creates organic stadium-wide excitement wave
 - [ ] Hook `WaveManager.on('waveComplete')` listener
 - [ ] Add +10 to bank on successful waves
 
 **Verification**:
-- Ultimate button only fires when bank >=30
-- Enhanced effects apply to more fans
-- Flash effect visible across stadium
-- Wave success boosts bank
+- ✅ Ultimate button only fires when bank >=30
+- ✅ Enhanced effects apply to all sections
+- ✅ Flash effect visible across stadium
+- ✅ Crowd goes wild with power-proportional intensity
+- ✅ All fans bounce with random timing for organic effect
+- [ ] Wave success boosts bank
 
 ---
 
-### 4.3 Implement Ultimate Ability
-**Files**: `MascotBehavior.ts`, `StadiumScene.ts`
-
-- [ ] Add `ultimateReady` flag (true when `attentionBank >= 30`)
-- [ ] Implement ultimate firing:
-  - Target count × 2
-  - Apply `ultimateStatBoosts` (attention +8, happiness +4)
-  - Ripple radius × 1.5
-  - Stadium white flash (depth 400, alpha 0.3, 200ms fade)
-  - Drain bank to 0
-- [ ] Hook `WaveManager.on('waveComplete')` listener
-- [ ] Add +10 to bank on successful waves
-
-**Verification**:
-- Ultimate only fires when bank >=30
-- Enhanced effects apply
-- Flash effect visible
-- Wave success boosts bank
-
----
-
-### 4.4 Add Mascot UI Controls
+### 4.5 Add Mascot UI Controls ✅
 **Files**: `StadiumScene.ts`, UI components
 
-- [ ] Add mascot control panel below vendor controls
-- [ ] "Target Section" button (cycles A→B→C→global)
-- [ ] "Fire Ultimate" button (disabled when bank <30)
-- [ ] Attention bank progress bar (0-100 fill)
-- [ ] Display bank value text "Attention: X/100"
-- [ ] Spawn mascot actor at (21, 16) with random personality
+- ✅ Add mascot control panel below vendor controls
+- ✅ "Target Section" button (cycles A→B→C)
+- ✅ "Fire Ultimate" button (disabled when bank <30)
+- ✅ Attention bank progress bar (0-100 fill, gold color)
+- ✅ Display bank value text "Attention: X/100"
+- ✅ Mascot spawns at grid-aligned ground position
+- ✅ Real-time UI updates in update loop
 
 **Verification**:
-- UI controls functional
-- Target cycling works
-- Ultimate button enables/disables correctly
-- Progress bar updates in real-time
+- ✅ UI controls functional
+- ✅ Target cycling works
+- ✅ Ultimate button enables/disables correctly
+- ✅ Progress bar updates in real-time
+- ✅ Visual feedback for cooldowns and readiness
 
 ---
 
@@ -611,6 +604,15 @@ clusterDecay: {
 
 ## Progress Tracking
 
-**Last Updated**: December 3, 2025  
-**Current Phase**: Phase 2 - Vendor Scoring & Dropoff System  
-**Next Step**: 3.2 - Apply Collision Penalties; 3.3 - Splat Mechanics; 5.x Announcer overlays; 6.x Fan stat decay
+**Last Updated**: December 4, 2025  
+**Current Phase**: Phase 4 - Mascot System (MOSTLY COMPLETE)  
+**Completed**: 
+- ✅ Phase 1: Grid Configuration & Foundation
+- ✅ Phase 2: Vendor Scoring & Dropoff System
+- ✅ Phase 3: Wave-Vendor Collision & Splat Mechanics
+- ✅ Phase 4.1-4.5: Mascot System (sprite, pathfinding, t-shirt cannon, stats, ultimate, crowd reaction, UI)
+
+**Remaining**:
+- [ ] Phase 4.4: Hook wave success → attention bank accumulation (+10 per wave)
+- [ ] Phase 5: Announcer Box & Event Callouts (full system)
+- [ ] Phase 6: Fan Stat Decay Refactor (cluster-based, auto-wave triggers)
