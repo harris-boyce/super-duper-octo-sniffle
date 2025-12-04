@@ -15,22 +15,31 @@ export const gameBalance = {
    * Fan stat configuration
    */
   fanStats: {
-    // Initial stat ranges
-
-    initialHappiness: 70,
+    // Initial stat ranges (Phase 5.5 adjusted for auto-wave balance)
+    initialHappiness: 70, // Matched to wave readiness threshold for immediate wave potential
     initialThirstMin: 15,
     initialThirstMax: 30,
-    initialAttention: 70,
+    initialAttention: 70, // Increased from 50 to give players time to engage vendors before attention drops
 
-    // Thirst two-phase system
-    thirstRollChance: 0.33, // Phase 1: Chance per second to START getting thirsty (0-1)
-    thirstActivationAmount: 5, // Phase 1: Big jump when roll succeeds (pushes over threshold)
-    thirstThreshold: 50, // Threshold for state transition (Phase 1 → Phase 2)
-    thirstDecayRate: 2, // Phase 2: Linear pts/sec after threshold
+    // Thirst two-phase linear system (Phase 5.2 refactor)
+    thirstPhase1Rate: 0.8, // Phase 1: Slow linear growth (0-60 thirst), pts/sec
+    thirstPhase2Rate: 2.5, // Phase 2: Fast linear growth (60-100 thirst), pts/sec
+    thirstPhase2Threshold: 60, // Threshold where thirst growth accelerates
+    
+    // Legacy thirst config (deprecated but kept for reference)
+    thirstRollChance: 0.33, // DEPRECATED: Phase 1: Chance per second to START getting thirsty (0-1)
+    thirstActivationAmount: 5, // DEPRECATED: Phase 1: Big jump when roll succeeds (pushes over threshold)
+    thirstThreshold: 50, // DEPRECATED: Threshold for state transition (Phase 1 → Phase 2)
+    thirstDecayRate: 2, // DEPRECATED: Phase 2: Linear pts/sec after threshold
+    
     unhappyHappinessThreshold: 30, // When happiness drops below this, fan becomes unhappy
-    happinessDecayRate: 1.0, // when thirst > 50
     attentionDecayRate: 1.5,
     attentionMinimum: 30,
+    waveStartThreshold: 70, // Happiness threshold for auto-wave triggering (Phase 5.3 refine) - lowered to 65 for forgiving opening
+    attentionMinimumForWave: 50, // Minimum attention required for wave readiness (Phase 5.3 refine)
+    // Attention-driven thirst mechanism (Issue #3)
+    attentionStagnationThreshold: 35, // If attention below this, fast thirst builds
+    attentionMinimumDuration: 8000, // ms that attention must stay below threshold before fast thirst kicks in
 
     // Freeze durations (milliseconds)
     thirstFreezeDuration: 4000,
@@ -116,26 +125,29 @@ export const gameBalance = {
     // Master toggle for autonomous wave system
     enabled: true,
 
-    // Triggering thresholds
-    waveStartHappinessThreshold: 0.60, // section avg happiness (0-100) must be >= this (60%) to trigger wave
+    // Triggering thresholds (Phase 5.3 refactor)
+    minReadyFans: 4, // Number of fans needed in section to initiate wave
+    initiationCooldown: 15000, // ms between auto-waves from same section
+    
+    waveStartHappinessThreshold: 60, // LEGACY: section avg happiness (0-100) must be >= this (60%) to trigger wave
     
     // Cooldown durations (milliseconds)
     successCooldown: 5000, // 5 seconds after successful wave completes
     failureCooldown: 9000, // 9 seconds after failed wave (5s base + 4s penalty)
     sectionStartCooldown: 8000, // 8 seconds before same section can initiate another wave
     
-    // Happiness decay configuration (replaces linear decay)
-    thirstHappinessDecayThreshold: 50, // happiness only decays when thirst > this value
-    thirstHappinessDecayRate: 1.0, // happiness decay rate (points per second) when thirsty
+    // Happiness decay configuration (DEPRECATED - moved to clusterDecay in Phase 5.1)
+    thirstHappinessDecayThreshold: 50, // DEPRECATED: happiness only decays when thirst > this value
+    thirstHappinessDecayRate: 1.0, // DEPRECATED: happiness decay rate (points per second) when thirsty
     
     // Peer pressure mechanics (section aggregate behavior)
     peerPressureHappinessThreshold: 75, // section avg happiness must be >= this for peer pressure boost
     peerPressureAttentionBoost: 0.5, // attention boost (points per second) for all fans in section
     
     // Wave completion rewards
-    waveCompletionHappinessBoost: 15, // temporary happiness boost when wave completes successfully
-    waveCompletionAttentionBoost: 20, // temporary attention boost when wave completes successfully
-    waveBoostDuration: 5000, // duration (ms) of temporary boosts
+    waveCompletionHappinessBoost: 2, // temporary happiness boost when wave completes successfully - Phase 5.6: reduced from 5
+    waveCompletionAttentionBoost: 3, // temporary attention boost when wave completes successfully - Phase 5.6: reduced from 5
+    waveBoostDuration: 2000, // duration (ms) of temporary boosts - Phase 5.6: reduced from 3000
     
     // Section position weights (edge sections more likely to start waves)
     // Keys represent total section count, values are arrays of weights by position
@@ -165,11 +177,34 @@ export const gameBalance = {
   },
 
   /**
+   * Cluster-based happiness decay configuration (Phase 5.1)
+   * Replaces individual per-fan happiness decay with interval-based cluster selection
+   */
+  clusterDecay: {
+    earlyInterval: 10000, // ms between cluster decay triggers (early game) - increased from 5000
+    lateInterval: 5000, // ms between cluster decay triggers (late game) - increased from 2000
+    lateGameThreshold: 0.75, // session progress (0-1) where decay accelerates
+    clusterSizeMin: 8, // minimum fans affected per cluster - Phase 5.6: increased to 8 for more aggressive decay
+    clusterSizeMax: 16, // maximum fans affected per cluster - Phase 5.6: increased to 16 (half a section)
+    adjacencyRadius: 5, // Manhattan distance for adjacent fan selection - Phase 5.6: sections are 5×8 cells, radius 5 gives good local clustering
+    // Decay rates by session time (points per second of elapsed time since last decay event)
+    // These are multiplied by timeSinceLastDecay to calculate total decay applied per cluster event
+    // e.g., earlyDecayRate 2.7 pts/sec × 10 sec interval = 27 happiness decay per event
+    earlyDecayRate: 2.7, // 0-30s - 27 points per 10s interval
+    midDecayRate: 6.4, // 30-70s - 32 points per 5s interval
+    lateDecayRate: 8.0, // 70-100s - 40 points per 5s interval
+    // Attention decays at 2.5x the rate of happiness, but capped lower
+    attentionDecayCap: 11, // Max -11 attention per decay - Phase 5.6: increased 25% from 9 (267% increase from original 3)
+    earlyPhaseEnd: 30000, // ms
+    midPhaseEnd: 70000, // ms
+  },
+
+  /**
    * Wave timing configuration (all in milliseconds, converted to seconds where needed)
    */
   waveTiming: {
-    triggerCountdown: 5000, // 10 seconds before wave fires
-    baseCooldown: 15000, // 10 seconds between waves
+    triggerCountdown: 5000, // 5 seconds before wave fires
+    baseCooldown: 10000, // 10 seconds between waves
     successRefund: 5000, // refund this much if all sections succeed
     columnDelay: 44, // ms between column animations
     rowDelay: 6, // ms between row animations within column
@@ -181,6 +216,8 @@ export const gameBalance = {
   sessionConfig: {
     runModeDuration: 100000, // 100 seconds for stadium run
     eternalModeDuration: Infinity, // unlimited time for eternal mode
+    countdownDuration: 3000, // 3 second countdown overlay (3-2-1)
+    gracePeriod: 5000, // 5 second grace period after countdown before autonomous logic starts
   },
 
   /**
@@ -701,10 +738,10 @@ export const gameBalance = {
    * Points earned based on service quality and dropoff mechanics
    */
   vendorScoring: {
-    basePoints: 1, // base points for any drink service
-    highThirstBonus: 2, // bonus points when fan thirst > 80
-    lowHappinessBonus: 3, // bonus points when fan happiness < 20
-    highThirstThreshold: 80, // thirst threshold for bonus
+    basePoints: 10, // base points for any drink service (increased from 1)
+    slowThirstReductionBonus: 2, // multiplier when reducing phase-1 thirst (slow→none)
+    fastThirstReductionBonus: 5, // multiplier when reducing phase-2 thirst (fast→none)
+    highThirstThreshold: 80, // thirst threshold for fast-building detection
     lowHappinessThreshold: 20, // happiness threshold for bonus
   },
 

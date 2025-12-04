@@ -47,6 +47,10 @@ export class GameStateManager {
   private eventListeners: Map<string, Array<Function>>;
   private waveBoosts: Map<string, WaveBoost> = new Map(); // Track temporary boosts per section
   private logger = LoggerService.instance();
+  
+  // Cluster decay state (global coordination)
+  private clusterDecayTimer: number = 0;
+  private sessionStartTime: number = 0;
 
   constructor() {
     // Initialize empty sections array - will be populated by initializeSections()
@@ -530,5 +534,46 @@ export class GameStateManager {
    */
   private clamp(value: number, min: number, max: number): number {
     return Math.min(Math.max(value, min), max);
+  }
+
+  /**
+   * Trigger cluster decay for sections in randomized order with diminishing returns
+   * Called from AIManager.update() to coordinate decay across all sections
+   */
+  public updateClusterDecay(delta: number, sessionTime: number, actorRegistry: any): void {
+    this.clusterDecayTimer += delta;
+    
+    // Get interval based on session progress
+    const progress = sessionTime / gameBalance.sessionConfig.runModeDuration;
+    const interval = progress >= gameBalance.clusterDecay.lateGameThreshold
+      ? gameBalance.clusterDecay.lateInterval
+      : gameBalance.clusterDecay.earlyInterval;
+    
+    if (this.clusterDecayTimer < interval) {
+      return; // Not time yet
+    }
+    
+    this.clusterDecayTimer = 0;
+    
+    // Get all section actors and randomize order
+    const sectionActors = actorRegistry?.getByCategory('section') || [];
+    if (sectionActors.length === 0) return;
+    
+    const shuffled = [...sectionActors].sort(() => Math.random() - 0.5);
+    
+    // Roll for decay with diminishing chance for each section
+    let diminishingMultiplier = 1.0;
+    for (const sectionActor of shuffled) {
+      // Roll for decay with diminishing returns
+      const roll = Math.random();
+      const threshold = 0.6 * diminishingMultiplier; // 60% base chance, reduced per section
+      
+      if (roll < threshold) {
+        // This section triggers decay
+        sectionActor.flagForDecay?.();
+        // Apply diminishing returns: next section has 60% of the chance
+        diminishingMultiplier *= 0.6;
+      }
+    }
   }
 }

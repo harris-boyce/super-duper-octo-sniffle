@@ -173,8 +173,10 @@ export class MascotBehavior implements AIActorBehavior {
       this.momentumEffectivenessFactor + 0.05 // restore 5% per wave success
     );
     // Add +10 to attention bank on wave success (Phase 4.3)
+    const oldBank = this.attentionBank;
     this.attentionBank = Math.min(100, this.attentionBank + 10);
     this.ultimateReady = this.attentionBank >= 30;
+    console.log(`[MascotBehavior] Wave success! Attention bank: ${oldBank} → ${this.attentionBank} (Ultimate ready: ${this.ultimateReady})`);
   }
 
   /** External trigger from wave failure to reset momentum */

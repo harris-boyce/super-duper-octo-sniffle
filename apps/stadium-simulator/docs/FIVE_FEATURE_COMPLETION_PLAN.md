@@ -298,8 +298,8 @@ Safeguards:
   - All fans react with random delays (0-500ms)
   - Intensity scales: 30p → 0.5 intensity (16px), 100p → 1.5 intensity (48px)
   - Creates organic stadium-wide excitement wave
-- [ ] Hook `WaveManager.on('waveComplete')` listener
-- [ ] Add +10 to bank on successful waves
+- ✅ Hook `WaveManager.on('waveComplete')` listener (via AIManager)
+- ✅ Add +10 to bank on successful waves (in MascotBehavior.onWaveSuccess)
 
 **Verification**:
 - ✅ Ultimate button only fires when bank >=30
@@ -307,7 +307,7 @@ Safeguards:
 - ✅ Flash effect visible across stadium
 - ✅ Crowd goes wild with power-proportional intensity
 - ✅ All fans bounce with random timing for organic effect
-- [ ] Wave success boosts bank
+- ✅ Wave success boosts bank (+10 per wave)
 
 ---
 
@@ -331,90 +331,9 @@ Safeguards:
 
 ---
 
-## Phase 5: Announcer Box & Event Callouts
+## Phase 5: Fan Stat Decay Refactor
 
-### 5.1 Create Announcer Box Scenery
-**Files**: `AnnouncerBoxActor.ts` (new), `StadiumScene.ts`
-
-- [ ] Create `AnnouncerBoxActor` extending `SceneryActor`
-- [ ] Gray rectangle: cols 10-21 (12-cell width), rows 12-13 (2 cells tall)
-- [ ] Depth: 100
-- [ ] Add two white horizontal "windows" (alpha 0.7):
-  - Width: 10 cells each
-  - Height: 0.3 cells
-  - Positions: row offsets +0.3 and +1.2
-- [ ] Instantiate in `StadiumScene.create()` at `gridToWorld(12, 15.5)`
-
-**Verification**:
-- Announcer box renders above corridor
-- Windows visible with correct opacity
-- Positioned centrally
-
----
-
-### 5.2 Create Speech Bubble Overlay
-**Files**: `SpeechBubble.ts` (update), `StadiumScene.ts`
-
-- [ ] Create `SpeechBubbleOverlay` component (depth 350)
-- [ ] White rounded rectangle (radius 8px)
-- [ ] Black text with word wrap
-- [ ] Triangular tail pointing to announcer box
-- [ ] Auto-dismiss timer: 4000ms
-- [ ] Queue system:
-  - Max 3 queued callouts
-  - 2000ms delay between displays
-
-**Verification**:
-- Bubble displays above all actors
-- Tail points correctly
-- Auto-dismiss works
-- Queue prevents spam
-
----
-
-### 5.3 Implement State Callouts
-**Files**: `SectionActor.ts`, `AIContentManager.ts`
-
-- [ ] Add stat monitoring in `SectionActor.update()`
-- [ ] Throttle checks: `lastCalloutTime + 8000 < now`
-- [ ] Trigger conditions:
-  - Average thirst >70
-  - Average attention <30
-- [ ] Emit `stateCallout` event
-- [ ] Generate vague hints via `AIContentManager.generateVagueCallout()`:
-  - "The crowd is getting restless"
-  - "Energy is dropping in the stands"
-  - No section names or specific directions
-
-**Config**: `announcer: {calloutDuration: 4000, minCalloutInterval: 8000, queueDelay: 2000, maxQueueLength: 3}`
-
-**Verification**:
-- Callouts trigger on threshold breach
-- Throttling prevents spam
-- Hints remain vague and helpful
-
----
-
-### 5.4 Implement Wave Anticipation Callouts
-**Files**: `WaveManager.ts`, `AIContentManager.ts`
-
-- [ ] Hook `WaveManager.on('waveTriggered')` event
-- [ ] Emit `waveAnticipation` with `{sectionId}`
-- [ ] Generate callout with section name:
-  - "Section {Name} is getting ready!"
-  - "Something's brewing in Section {Name}!"
-- [ ] Queue in speech bubble overlay
-
-**Verification**:
-- Callouts appear on wave trigger
-- Section names display correctly
-- Timing doesn't interfere with gameplay
-
----
-
-## Phase 6: Fan Stat Decay Refactor
-
-### 6.1 Implement Cluster-Based Happiness Decay
+### 5.1 Implement Cluster-Based Happiness Decay
 **Files**: `SectionActor.ts`, `gameBalance.ts`
 
 - [ ] Cache `sessionLength` in `SectionActor` constructor
@@ -444,7 +363,7 @@ Safeguards:
 
 ---
 
-### 6.2 Refactor Thirst Buildup
+### 5.2 Refactor Thirst Buildup
 **Files**: `FanActor.ts`, `gameBalance.ts`
 
 - [ ] Remove random activation logic from `updateStats()`
@@ -460,7 +379,7 @@ Safeguards:
 
 ---
 
-### 6.3 Implement Auto-Wave Triggering
+### 5.3 Implement Auto-Wave Triggering
 **Files**: `FanActor.ts`, `SectionActor.ts`, `WaveManager.ts`, `gameBalance.ts`
 
 - [ ] Add `waveStartThreshold: 75` to config
@@ -483,7 +402,7 @@ Safeguards:
 
 ---
 
-### 6.4 Add Section Blink Effect
+### 5.4 Add Section Blink Effect
 **Files**: `SectionActor.ts`, `WaveManager.ts`
 
 - [ ] Hook `WaveManager.emit('waveCountdownStarted', {sectionId})`
@@ -507,7 +426,7 @@ Safeguards:
 
 ---
 
-### 6.5 Adjust Initial Fan Stats
+### 5.5 Adjust Initial Fan Stats
 **Files**: `gameBalance.ts`
 
 - [ ] Update `fanStats.defaultStats`:
@@ -522,6 +441,87 @@ Safeguards:
 - Fans start with adjusted stats
 - No immediate wave readiness
 - Visual feedback on cluster decay
+
+---
+
+## Phase 6: Announcer Box & Event Callouts
+
+### 6.1 Create Announcer Box Scenery
+**Files**: `AnnouncerBoxActor.ts` (new), `StadiumScene.ts`
+
+- [ ] Create `AnnouncerBoxActor` extending `SceneryActor`
+- [ ] Gray rectangle: cols 10-21 (12-cell width), rows 12-13 (2 cells tall)
+- [ ] Depth: 100
+- [ ] Add two white horizontal "windows" (alpha 0.7):
+  - Width: 10 cells each
+  - Height: 0.3 cells
+  - Positions: row offsets +0.3 and +1.2
+- [ ] Instantiate in `StadiumScene.create()` at `gridToWorld(12, 15.5)`
+
+**Verification**:
+- Announcer box renders above corridor
+- Windows visible with correct opacity
+- Positioned centrally
+
+---
+
+### 6.2 Create Speech Bubble Overlay
+**Files**: `SpeechBubble.ts` (update), `StadiumScene.ts`
+
+- [ ] Create `SpeechBubbleOverlay` component (depth 350)
+- [ ] White rounded rectangle (radius 8px)
+- [ ] Black text with word wrap
+- [ ] Triangular tail pointing to announcer box
+- [ ] Auto-dismiss timer: 4000ms
+- [ ] Queue system:
+  - Max 3 queued callouts
+  - 2000ms delay between displays
+
+**Verification**:
+- Bubble displays above all actors
+- Tail points correctly
+- Auto-dismiss works
+- Queue prevents spam
+
+---
+
+### 6.3 Implement State Callouts
+**Files**: `SectionActor.ts`, `AIContentManager.ts`
+
+- [ ] Add stat monitoring in `SectionActor.update()`
+- [ ] Throttle checks: `lastCalloutTime + 8000 < now`
+- [ ] Trigger conditions:
+  - Average thirst >70
+  - Average attention <30
+- [ ] Emit `stateCallout` event
+- [ ] Generate vague hints via `AIContentManager.generateVagueCallout()`:
+  - "The crowd is getting restless"
+  - "Energy is dropping in the stands"
+  - No section names or specific directions
+
+**Config**: `announcer: {calloutDuration: 4000, minCalloutInterval: 8000, queueDelay: 2000, maxQueueLength: 3}`
+
+**Verification**:
+- Callouts trigger on threshold breach
+- Throttling prevents spam
+- Hints remain vague and helpful
+
+---
+
+### 6.4 Implement Wave Anticipation Callouts
+**Files**: `WaveManager.ts`, `AIContentManager.ts`
+
+- [ ] Hook `WaveManager.on('waveTriggered')` event
+- [ ] Emit `waveAnticipation` with `{sectionId}`
+- [ ] Generate callout with section name:
+  - "Section {Name} is getting ready!"
+  - "Something's brewing in Section {Name}!"
+- [ ] Queue in speech bubble overlay
+
+**Verification**:
+- Callouts appear on wave trigger
+- Section names display correctly
+- Timing doesn't interfere with gameplay
 
 ---
 
@@ -610,9 +610,8 @@ clusterDecay: {
 - ✅ Phase 1: Grid Configuration & Foundation
 - ✅ Phase 2: Vendor Scoring & Dropoff System
 - ✅ Phase 3: Wave-Vendor Collision & Splat Mechanics
-- ✅ Phase 4.1-4.5: Mascot System (sprite, pathfinding, t-shirt cannon, stats, ultimate, crowd reaction, UI)
+- ✅ Phase 4: Mascot System (COMPLETE - sprite, pathfinding, t-shirt cannon, stats, ultimate, crowd reaction, UI, wave success charging)
 
 **Remaining**:
-- [ ] Phase 4.4: Hook wave success → attention bank accumulation (+10 per wave)
-- [ ] Phase 5: Announcer Box & Event Callouts (full system)
-- [ ] Phase 6: Fan Stat Decay Refactor (cluster-based, auto-wave triggers)
+- [ ] Phase 5: Fan Stat Decay Refactor (cluster-based, auto-wave triggers) ← **CURRENT FOCUS**
+- [ ] Phase 6: Announcer Box & Event Callouts (atmospheric enhancement)

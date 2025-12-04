@@ -422,6 +422,10 @@ export class AIManager {
    * @param scene - Phaser scene (passed to actors for time.now access)
    */
   public update(deltaTime: number, roundTime: number, scene?: Phaser.Scene): void {
+    // 0. Coordinate cluster decay across sections (GameStateManager determines which sections decay)
+    const sessionTime = Date.now() - (this.gameState as any).sessionStartTime;
+    this.gameState.updateClusterDecay(deltaTime, sessionTime, this.actorRegistry);
+
     // 1. Scenery (SectionActor updates all fans + aggregates)
     this.updateSceneryActors(deltaTime, roundTime, scene);
 
@@ -555,8 +559,11 @@ export class AIManager {
       const behavior = (vendorActor as any).getBehavior?.();
       behavior?.onWaveSuccess?.();
     }
-    for (const mascot of this.mascotActors) {
-      (mascot as any).getBehavior?.().onWaveSuccess?.();
+    // Only charge mascot ult on FULL wave success, not per-section
+    if (data.type === 'full') {
+      for (const mascot of this.mascotActors) {
+        (mascot as any).getBehavior?.().onWaveSuccess?.();
+      }
     }
     this.emit('waveSuccessProcessed', data);
   }

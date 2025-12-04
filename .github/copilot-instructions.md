@@ -51,8 +51,9 @@ Example: `FanActor.ts` transitions to `disengaged` when `attention < 30 && happi
 
 **Vendor Behavior States:**
 - `DrinkVendorBehavior` (in `src/actors/behaviors/`) implements `AIActorBehavior` interface.
-- States: `awaitingAssignment` → `idle` → `targeting` → `moving` → `serving` → `recalling`.
-- On service complete: `fan.drinkServed()` adjusts stats (thirst -100, happiness +15).
+- States: `awaitingAssignment` → `idle` → `targeting` → `moving` → `serving` → `recalling` → `splatted`.
+- On service complete: `fan.drinkServed()` adjusts stats (thirst -100, happiness +15), behavior tracks `pointsEarned`.
+- Wave collision: Vendors can be "splatted" by waves with probability based on `pointsEarned` (risk/reward mechanic).
 
 **Wave Mechanics:**
 - `WaveManager.propagateWave()` iterates sections/columns via `ActorRegistry` and `GridManager`.
@@ -73,6 +74,14 @@ Example: `FanActor.ts` transitions to `disengaged` when `attention < 30 && happi
 - Interfaces in `{namespace}/interfaces/`: `import type { Section } from '@/managers/interfaces/Section'`.
 - Helpers in `{namespace}/helpers/`: `import { BaseManager } from '@/managers/helpers/BaseManager'`.
 - Path alias `@` maps to `src/`.
+
+**Mascot System:**
+- `MascotActor` + `MascotBehavior` follow actor/behavior pattern like vendors.
+- Targeting cycles: `section` → `global` → `cluster` (deterministic rotation).
+- Ultimate ability: Triggered based on cooldown (45s base) and momentum from consecutive wave successes.
+- T-shirt cannon: Fire 3-5 shots per activation, apply global boosts + targeted attention/happiness effects.
+- Configuration: `gameBalance.mascotBehavior.*`, `gameBalance.mascotUltimate.*`, `gameBalance.mascotCannon.*`.
+- See `docs/MASCOT_SYSTEM.md` for complete details.
 
 ## Developer Workflows
 
@@ -114,10 +123,14 @@ npm run test:api         # API tests only (vitest.api.config.ts)
 - **Config is single source:** Edit `src/config/gameBalance.ts` for tuning, not inline constants.
 - **Interfaces are separate:** Use `src/{namespace}/interfaces/` for type definitions.
 - **Event cleanup:** Always unsubscribe from manager events in scene `shutdown()`.
+- **Logging:** Use `LoggerService.instance()` for structured logging, not `console.log` (except temporary debugging).
+- **State enums:** Import `AIActorState` from `@/actors/interfaces/AIBehavior` for behavior state machines.
+- **Testing:** Vitest with `happy-dom` environment. Phaser mocked via `src/__tests__/setup.ts`. Run `npm test` for all, `npm run test:api` for API-only.
 
 **Score Display vs Tracking:**
 - HUD shows only total running score via `GameStateManager.getTotalScore()`.
 - Track breakdowns internally (wave gained, vendor gained, wave lost, vendor lost) for end-of-session reporting.
+- Vendor behaviors track individual `pointsEarned` for scoring and splat probability.
 
 ## Integration Points
 
@@ -138,12 +151,30 @@ npm run test:api         # API tests only (vitest.api.config.ts)
 - Integration: `GridManager` provides `getNeighbors(row, col)` with walls and transitions.
 - Vendor behaviors use `pathfindingService.findPath(start, goal)`.
 
-## Current Focus Areas
+**Vendor Scoring & Drop Zones:**
+- Behaviors track `pointsEarned` internally: base points + bonuses for high thirst/low happiness.
+- Drop zones: Designated grid cells where vendors return, flash white, fade out, then respawn after cooldown.
+- Floating text: Score displays above drop zone (`floatingTextDepth: 10000` to render above all UI).
+- Configuration: `gameBalance.vendorScoring.*`, `gameBalance.dropZone.*`.
 
-- Refactor remaining systems to use FanActor state machine (remove sprite dependencies).
-- Complete `HybridPathResolver` for vendor navigation with collision avoidance.
-- Implement MascotBehavior following same actor/behavior pattern as vendors.
-- Scoring system for vendor performance (points earned tracked in behavior).
+**Wave-Vendor Collision (Splat Mechanic):**
+- When wave propagates through vendor's position, `handleCollisionSplat()` rolls for splat.
+- Splat chance: `pointsEarned * splatChancePerPoint` (capped at 50%, higher score = higher risk).
+- On splat: Vendor enters `splatted` state for `splatRecoveryTime` ms, section attention penalty applied.
+- Configuration: `gameBalance.waveCollision.*` (row ranges, tolerances, penalties).
+
+**Logging System:**
+- Use `LoggerService.instance()` singleton for structured logging (not `console.log`).
+- Provides categorized log entries with timestamps for debugging and analytics.
+- Found in `src/services/LoggerService.ts`, used by `ActorRegistry` and other core systems.
+
+## Current Focus Areas (Branch: sb/add-vendor-scoring-and-splat)
+
+- ✅ **Completed**: Vendor scoring system with point tracking and drop zone mechanics.
+- ✅ **Completed**: Wave-vendor collision system with splat state and risk/reward mechanics.
+- ✅ **Completed**: Mascot system - actor/behavior pattern, targeting cycles, ultimate ability, wave success charging.
+- 🔄 **Active**: Phase 5 - Fan Stat Decay Refactor (cluster-based happiness decay, linear thirst, auto-wave triggers).
+- 📋 **Next**: Phase 6 - Announcer Box & Event Callouts (atmospheric enhancement).
 
 ## Quick References
 

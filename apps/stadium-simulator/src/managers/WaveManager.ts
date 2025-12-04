@@ -32,6 +32,9 @@ export class WaveManager {
   private actorRegistry?: ActorRegistry; // ActorRegistry reference
   private eventListeners: Map<string, Array<Function>>;
   private propagating: boolean;
+  // Wave cooldown tracking (prevents overlapping waves)
+  private lastWaveCompleteTime: number = 0;
+  private waveCooldown: number = gameBalance.waveTiming.baseCooldown; // 15 seconds base
   // private seatManager?: SeatManager; // DELETED - logic moved to SectionActor
   private waveSprite?: WaveSprite; // WaveSprite instance
   private waveSpriteCreated: boolean = false;
@@ -424,17 +427,30 @@ export class WaveManager {
    * @param success - Whether wave completed successfully
    */
   public recordWaveEnd(success: boolean): void {
-    const cooldown = success 
-      ? gameBalance.waveAutonomous.successCooldown
-      : gameBalance.waveAutonomous.failureCooldown;
+    // Update cooldown based on success
+    // Full wave success: reduce cooldown from 15s base to 10s (15 - 5 refund)
+    // Partial/failed wave: keep at 15s base
+    this.waveCooldown = success 
+      ? gameBalance.waveTiming.baseCooldown - gameBalance.waveTiming.successRefund
+      : gameBalance.waveTiming.baseCooldown;
     
-    this.lastWaveEndTime = Date.now();
-    this.lastWaveCooldownDuration = cooldown;
+    this.lastWaveCompleteTime = Date.now();
     
     // legacy wave end console logging removed
     
     // Emit event with cooldown info
-    this.emit('waveCooldownStarted', { success, cooldown, endsAt: this.lastWaveEndTime + cooldown });
+    this.emit('waveCooldownStarted', { success, cooldown: this.waveCooldown, endsAt: this.lastWaveCompleteTime + this.waveCooldown });
+  }
+
+  /**
+   * Check if wave is in global cooldown (prevents waves while one is active or during cooldown)
+   */
+  public isWaveOnCooldown(): boolean {
+    if (this.active) {
+      return true; // Wave is active
+    }
+    const timeSinceComplete = Date.now() - this.lastWaveCompleteTime;
+    return timeSinceComplete < this.waveCooldown;
   }
 
   /**
@@ -579,6 +595,12 @@ export class WaveManager {
 
     // Emit event for visuals (incoming cue)
     this.emit('waveCreated', { wave: wave.toJSON() });
+
+    // Emit countdown event for section blink effect
+    this.emit('waveCountdownStarted', { 
+      sectionId: originSectionId, 
+      countdown: gameBalance.waveTiming.triggerCountdown 
+    });
 
     // Actually start the wave propagation!
     this.startWave();

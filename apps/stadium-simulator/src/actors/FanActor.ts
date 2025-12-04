@@ -43,6 +43,13 @@ export class FanActor extends AnimatedActor {
   private excitedUntil: number = 0; // Temporary excited state from t-shirt cannon
   public reducedEffort: boolean = false;
   public lastWaveParticipated: boolean = false;
+  
+  // Auto-wave triggering (Phase 5.3)
+  private waveReady: boolean = false;
+  
+  // Attention-driven thirst mechanism (Issue #3)
+  private lastAttentionLevel: number = 0;
+  private attentionStagnationTimer: number = 0;
 
   constructor(
     id: string,
@@ -69,6 +76,7 @@ export class FanActor extends AnimatedActor {
         Math.random() * (gameBalance.fanStats.initialThirstMax - gameBalance.fanStats.initialThirstMin) +
         gameBalance.fanStats.initialThirstMin;
       this.attention = gameBalance.fanStats.initialAttention;
+      console.log(`[FanActor ${this.id}] Init attention: ${this.attention}`);
     }
 
     this.logger.debug('FanActor created with game state');
@@ -118,6 +126,21 @@ export class FanActor extends AnimatedActor {
   }
 
   /**
+   * Get the fan sprite (for visual effects like cluster decay feedback)
+   */
+  public getSprite(): Fan {
+    return this.fan;
+  }
+
+  /**
+   * Check if fan is ready to trigger a wave (happiness >= threshold)
+   * Used by SectionActor for auto-wave triggering (Phase 5.3)
+   */
+  public isWaveReady(): boolean {
+    return this.waveReady;
+  }
+
+  /**
    * Determine if fan is currently disinterested (low attention + low happiness).
    * Used by engagement, targeting, ripple stubs, and mascot ability heuristics.
    */
@@ -130,6 +153,8 @@ export class FanActor extends AnimatedActor {
 
   public setHappiness(value: number): void {
     this.happiness = Math.max(0, Math.min(100, value));
+    // Update wave readiness immediately (Phase 5.6: happiness is sole gate for wave initiation)
+    this.waveReady = this.happiness >= gameBalance.fanStats.waveStartThreshold;
     // Visual update deferred to update() state machine
   }
 
@@ -139,7 +164,11 @@ export class FanActor extends AnimatedActor {
   }
 
   public setAttention(value: number): void {
-    this.attention = Math.max(0, Math.min(100, value));
+    const newVal = Math.max(0, Math.min(100, value));
+    if (newVal !== this.attention) {
+      // console.log(`[FanActor ${this.id}] setAttention: ${this.attention} → ${newVal}`);
+    }
+    this.attention = newVal;
     // Visual update deferred to update() state machine
   }
 
@@ -179,21 +208,30 @@ export class FanActor extends AnimatedActor {
   /** Generic stat modification helper (delta-based) */
   public modifyStats(delta: { happiness?: number; thirst?: number; attention?: number }): void {
     let penaltyApplied = false;
+    let beforeClamp : number = 0;
+    let afterClamp : number = 0;
     if (delta.happiness !== undefined) {
-      this.happiness = Phaser.Math.Clamp(this.happiness + delta.happiness, 0, 100);
+      beforeClamp = this.happiness + delta.happiness
+      afterClamp = Phaser.Math.Clamp(this.happiness + delta.happiness, 0, 100);
+      this.setHappiness(afterClamp);
       if (delta.happiness < 0) penaltyApplied = true;
     }
     if (delta.thirst !== undefined) {
       this.thirst = Phaser.Math.Clamp(this.thirst + delta.thirst, 0, 100);
     }
     if (delta.attention !== undefined) {
-      this.attention = Phaser.Math.Clamp(this.attention + delta.attention, 0, 100);
+      beforeClamp = this.attention + delta.attention;
+      afterClamp = Phaser.Math.Clamp(beforeClamp, 0, 100);
+      if (afterClamp !== this.attention) {
+        // console.log(`[FanActor ${this.id}] modifyStats attention: ${this.attention} + ${delta.attention} = ${beforeClamp} (clamped: ${afterClamp})`);
+      }
+      this.setAttention(afterClamp);
       if (delta.attention < 0) penaltyApplied = true;
     }
     // If a penalty was applied, blink the fan's border red
-    if (penaltyApplied && this.fan?.blinkBorderRed) {
-      this.fan.blinkBorderRed();
-    }
+    // if (penaltyApplied && this.fan?.blinkBorderRed) {
+    //   this.fan.blinkBorderRed();
+    // }
     // Visual update deferred to update() state machine
   }
 
@@ -207,41 +245,48 @@ export class FanActor extends AnimatedActor {
     const frameSeconds = deltaTime / 1000;
 
     // Attention freeze logic
+    // NOTE: Per-frame attention decay REMOVED (Phase 5.1 - now handled by cluster decay in SectionActor)
+    // Attention should only decay in burst events, not continuously
     if (this.attentionFreezeUntil && scene.time.now < this.attentionFreezeUntil) {
       // Do not decrease attention while frozen
     } else {
-      this.attention = Math.max(
-        gameBalance.fanStats.attentionMinimum,
-        this.attention - frameSeconds * gameBalance.fanStats.attentionDecayRate
-      );
+      // ATTENTION DECAY REMOVED - cluster decay handles this now
+      // const decayAmount = frameSeconds * gameBalance.fanStats.attentionDecayRate;
+      // const newAttention = Math.max(
+      //   gameBalance.fanStats.attentionMinimum,
+      //   this.attention - decayAmount
+      // );
+      // this.attention = newAttention;
     }
+
+    // Attention-driven thirst mechanism (Issue #3)
+    // Track if attention is stagnating at low levels, which triggers fast thirst
+    if (this.attention < gameBalance.fanStats.attentionStagnationThreshold) {
+      this.attentionStagnationTimer += deltaTime;
+    } else {
+      this.attentionStagnationTimer = 0;
+    }
+    const attentionStagnant = this.attentionStagnationTimer >= gameBalance.fanStats.attentionMinimumDuration;
 
     // Thirst freeze logic
     if (this.thirstFreezeUntil && scene.time.now < this.thirstFreezeUntil) {
       // Do not increase thirst while frozen
     } else {
-      // Thirst two-phase system:
-      // Phase 1 (below threshold): Roll to START getting thirsty
-      // Phase 2 (above threshold): Linear decay after getting thirsty
-      if (this.thirst < gameBalance.fanStats.thirstThreshold) {
-        // Phase 1: Roll to start getting thirsty
-        const rollChance = gameBalance.fanStats.thirstRollChance * environmentalModifier * frameSeconds;
-        if (Math.random() < rollChance) {
-          // Activation amount pushes fan over threshold
-          const thirstAmount = gameBalance.fanStats.thirstActivationAmount * environmentalModifier;
-          this.thirst = Math.min(100, this.thirst + thirstAmount);
-        }
+      // Thirst two-phase linear system (Phase 5.2 refactor) with attention-driven acceleration:
+      // Phase 1 (0-60): Slow linear growth (unless attention is stagnant)
+      // Phase 2 (60-100): Fast linear growth
+      // If attention is stagnant for too long, accelerate to Phase 2 rate regardless of thirst level
+      if (this.thirst < gameBalance.fanStats.thirstPhase2Threshold && !attentionStagnant) {
+        // Phase 1: Slow growth (0-60)
+        this.thirst = Math.min(100, this.thirst + gameBalance.fanStats.thirstPhase1Rate * environmentalModifier * frameSeconds);
       } else {
-        // Phase 2: Linear decay after threshold
-        const decayRate = gameBalance.fanStats.thirstDecayRate * environmentalModifier * frameSeconds;
-        this.thirst = Math.min(100, this.thirst + decayRate);
+        // Phase 2: Fast growth (60-100) OR fast growth due to attention stagnation
+        this.thirst = Math.min(100, this.thirst + gameBalance.fanStats.thirstPhase2Rate * environmentalModifier * frameSeconds);
       }
     }
 
-    // Thirsty fans get less happy
-    if (this.thirst > 50) {
-      this.happiness = Math.max(0, this.happiness - frameSeconds * gameBalance.fanStats.happinessDecayRate);
-    }
+    // Individual happiness decay REMOVED (Phase 5.1 - now handled by cluster decay in SectionActor)
+    // Legacy code: if (this.thirst > 50) { this.happiness -= ... }
 
     // Disappointment accumulation (future grump-only feature)
     if (this.thirst > 50 && this.happiness < gameBalance.grumpConfig.unhappyThreshold) {
@@ -252,6 +297,10 @@ export class FanActor extends AnimatedActor {
     } else {
       this.disappointment = Math.max(0, this.disappointment - frameSeconds * 0.5);
     }
+
+    // Auto-wave readiness tracking (Phase 5.3)
+    // Phase 5.6: Only happiness gates wave initiation (attention affects success, not start)
+    this.waveReady = this.happiness >= gameBalance.fanStats.waveStartThreshold;
 
     // Visual updates deferred to update() state machine
   }
@@ -281,8 +330,22 @@ export class FanActor extends AnimatedActor {
    */
   public onWaveParticipation(scene: Phaser.Scene, success: boolean): void {
     if (success) {
-      this.attention = 100;
-      this.attentionFreezeUntil = scene.time.now + gameBalance.fanStats.attentionFreezeDuration;
+      // Modest attention boost on wave success (not a full freeze)
+      const attnBoost = gameBalance.waveAutonomous.waveCompletionAttentionBoost || 0;
+      const happyBoost = gameBalance.waveAutonomous.waveCompletionHappinessBoost || 0;
+      const newAttention = Math.min(100, this.attention + attnBoost);
+      const newHappiness = Math.min(100, this.happiness + happyBoost);
+      if(Math.random() < 0.15){
+        // 35% of the time, log fan happiness and attention after wave participation
+        console.log(`[FanActor ${this.id}] onWaveParticipation: attention ${this.attention} + ${attnBoost} = ${newAttention}`);
+        console.log(`[FanActor ${this.id}] onWaveParticipation: happiness ${this.happiness} + ${happyBoost} = ${newHappiness}`);
+      }
+      
+      // this.attention = newAttention;
+      // this.setAttention(newAttention);
+      this.setHappiness(newHappiness);
+      // Short freeze to prevent immediate re-decay, but allow attention to drop quickly after
+      this.attentionFreezeUntil = scene.time.now + 1000; // 1 second freeze (was 5000)
       this.reducedEffort = false;
     }
   }
@@ -621,7 +684,9 @@ export class FanActor extends AnimatedActor {
     }
     
     // 5. Engaged state (high attention or recent wave participation)
-    if (this.attention > 70 || this.lastWaveParticipated) {
+    if (this.attention > 100 
+      ) {
+      // || this.lastWaveParticipated) {
       return 'engaged';
     }
     

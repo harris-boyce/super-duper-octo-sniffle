@@ -514,20 +514,20 @@ export class DrinkVendorBehavior implements AIActorBehavior {
    */
   public onServeComplete(): void {
     if (this.targetFanActor) {
-      // Calculate points earned based on fan stats before service
+      // Calculate points earned based on fan stats before service (Issue #4)
       const fanThirst = this.targetFanActor.getThirst();
       const fanHappiness = this.targetFanActor.getHappiness();
       
       let points = gameBalance.vendorScoring.basePoints;
       
-      if (fanThirst > gameBalance.vendorScoring.highThirstThreshold) {
-        points += gameBalance.vendorScoring.highThirstBonus;
-        // console.log('[DrinkVendorBehavior] High thirst bonus:', gameBalance.vendorScoring.highThirstBonus);
-      }
-      
-      if (fanHappiness < gameBalance.vendorScoring.lowHappinessThreshold) {
-        points += gameBalance.vendorScoring.lowHappinessBonus;
-        // console.log('[DrinkVendorBehavior] Low happiness bonus:', gameBalance.vendorScoring.lowHappinessBonus);
+      // Bonus multipliers based on thirst phase reduction (Issue #4)
+      // x2 if reducing slow thirst (phase 1: 0-60), x5 if reducing fast thirst (phase 2: 60+)
+      if (fanThirst >= gameBalance.fanStats.thirstPhase2Threshold) {
+        // Reducing from fast-building phase
+        points *= gameBalance.vendorScoring.fastThirstReductionBonus;
+      } else if (fanThirst > gameBalance.fanStats.thirstPhase2Threshold * 0.5) {
+        // Reducing from slow-building phase
+        points *= gameBalance.vendorScoring.slowThirstReductionBonus;
       }
       
       this.pointsEarned += points;

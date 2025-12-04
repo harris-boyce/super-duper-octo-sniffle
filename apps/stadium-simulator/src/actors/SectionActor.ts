@@ -30,6 +30,20 @@ export class SectionActor extends SceneryActor {
   private actorRegistry?: any;
   private lastCollisionAppliedWaveKeys: Set<string> = new Set();
 
+  // Cluster decay tracking (Phase 5.1)
+  private clusterDecayTimer: number = 0;
+  private sessionStartTime: number = 0;
+  private sessionLength: number = 100000; // Will be set from gameBalance
+  private shouldDecayThisFrame: boolean = false; // Flag from GameStateManager
+  
+  // Auto-wave tracking (Phase 5.3)
+  private readyFanCount: number = 0;
+  private lastWaveInitiateTime: number = 0;
+  
+  // Debug tracking: sample one fan per section for stat monitoring
+  private sampleFanActor?: FanActor;
+  private sceneStartTime: number = 0;
+
   constructor(
     id: string,
     scene: Phaser.Scene,
@@ -90,6 +104,20 @@ export class SectionActor extends SceneryActor {
       });
     }
     this.logger.debug(`SectionActor created for section ${sectionData.id}`);
+    
+    // Initialize session tracking for cluster decay (Phase 5.1)
+    this.sessionLength = gameBalance.sessionConfig.runModeDuration;
+    // sessionStartTime will be set when session activates (not at scene creation)
+    this.sessionStartTime = 0;
+    
+    // Setup event listeners (Phase 5.4)
+    if (this.actorRegistry && this.actorRegistry.on) {
+      this.actorRegistry.on('waveCountdownStarted', (data: { sectionId: string; countdown: number }) => {
+        if (data.sectionId === this.sectionId) {
+          this.startBlinkEffect(data.countdown);
+        }
+      });
+    }
   }
 
   /**
@@ -181,6 +209,28 @@ export class SectionActor extends SceneryActor {
     });
 
     this.logger.debug(`Section ${this.sectionId} populated with ${this.fans.size} fans across ${rowCount} rows`);
+    
+    // Pick first fan as sample for stat tracking (debug)
+    const fanActorsArray = Array.from(this.fanActors.values());
+    if (fanActorsArray.length > 0) {
+      this.sampleFanActor = fanActorsArray[0];
+    }
+  }
+
+  /**
+   * Set the scene start time for timestamp logging
+   */
+  public setSceneStartTime(time: number): void {
+    this.sceneStartTime = time;
+  }
+
+  /**
+   * Activate session timing - called when countdown completes
+   * Starts autonomous logic (cluster decay, auto-wave triggering)
+   */
+  public activateSession(): void {
+    this.sessionStartTime = Date.now();
+    console.log(`[SectionActor ${this.sectionId}] Session activated at ${this.sessionStartTime}`);
   }
 
   /**
@@ -449,14 +499,90 @@ private lastLoggedTargetFan: number = 0;
    * @param environmentalModifier - Environmental thirst multiplier
    */
   public update(delta: number, roundTime: number, scene?: Phaser.Scene, environmentalModifier: number = 1.0): void {
-    // Update all fan actors (stat decay + state transitions)
+    // Check if session has started and grace period has passed
+    const sessionActive = this.sessionStartTime > 0;
+    const gracePeriodPassed = sessionActive && (Date.now() - this.sessionStartTime) >= gameBalance.sessionConfig.gracePeriod;
+    
+    // Update all fan actors (stat decay + state transitions) - ALWAYS runs
     const allFanActors = this.getFanActors();
     for (const fanActor of allFanActors) {
       fanActor.update(delta, roundTime, scene, environmentalModifier);
     }
     
-    // Update cached aggregate values for performance
+    // Update cached aggregate values for performance - ALWAYS runs
     this.updateAggregateCache();
+    
+    // STOP HERE if session hasn't started or grace period hasn't passed
+    // This prevents cluster decay and auto-wave triggering during countdown and grace period
+    if (!gracePeriodPassed) {
+      return;
+    }
+    
+    // Cluster decay logic (Phase 5.1) - triggered by GameStateManager
+    if (this.shouldDecayThisFrame) {
+      const sessionTime = Date.now() - this.sessionStartTime;
+      const progress = sessionTime / this.sessionLength;
+      const interval = progress >= gameBalance.clusterDecay.lateGameThreshold
+        ? gameBalance.clusterDecay.lateInterval
+        : gameBalance.clusterDecay.earlyInterval;
+      this.applyClusterDecay(sessionTime, interval);
+      this.shouldDecayThisFrame = false; // Reset flag
+    }
+    
+    // Auto-wave triggering (Phase 5.3)
+    // Count fans ready to wave and emit initiation event if threshold met
+    const previousReadyCount = this.readyFanCount;
+    this.readyFanCount = allFanActors.filter(fan => fan.isWaveReady()).length;
+    
+    // Log readiness changes with timestamp and sample fan stats (debug)
+    if (this.readyFanCount !== previousReadyCount) {
+      const elapsed = this.sceneStartTime > 0 ? (Date.now() - this.sceneStartTime) / 1000 : 0;
+      let sampleStats = '';
+      if (this.sampleFanActor) {
+        sampleStats = ` [Sample fan: happiness=${this.sampleFanActor.getHappiness().toFixed(0)}, attention=${this.sampleFanActor.getAttention().toFixed(0)}]`;
+      }
+      console.log(`[${elapsed.toFixed(1)}s] [Section ${this.sectionId}] Ready fan count: ${previousReadyCount} → ${this.readyFanCount}${sampleStats}`);
+    }
+
+    const gate1Pass = this.readyFanCount >= gameBalance.waveAutonomous.minReadyFans;
+        
+        // Get section average happiness for wave success determination
+      const avgHappiness = this.happinessAgg;
+      
+      // Gate 2 (OPTIONAL): Section average happiness threshold
+      // Uncomment to enable: prevents "gate opens but wave fails" scenario
+      const sectionHappinessThreshold = gameBalance.waveAutonomous.waveStartHappinessThreshold; // Minimum section avg happiness to trigger
+      const gate2Pass = avgHappiness >= sectionHappinessThreshold;
+    
+    if (gate1Pass && gate2Pass) {
+      const now = Date.now();
+      // Throttle wave initiations (cooldown per section)
+      if (now - this.lastWaveInitiateTime > gameBalance.waveAutonomous.initiationCooldown) {
+        this.lastWaveInitiateTime = now;
+        
+        // Hybrid wave triggering (Phase 5.5):
+        // Gate 1: Minimum ready fans requirement (REQUIRED)
+        
+        
+        // For now, only check Gate 1; Gate 2 can be enabled if needed
+        const shouldInitiate = gate1Pass; // && gate2Pass;
+        
+        // Emit via actorRegistry for WaveManager to listen
+        if (shouldInitiate && this.actorRegistry && typeof this.actorRegistry.emit === 'function') {
+          const elapsed = this.sceneStartTime > 0 ? (Date.now() - this.sceneStartTime) / 1000 : 0;
+          console.log(`[${elapsed.toFixed(1)}s] [Section ${this.sectionId}] Wave gate OPEN: ${this.readyFanCount} ready fans (threshold: ${gameBalance.waveAutonomous.minReadyFans}), avg happiness: ${avgHappiness.toFixed(1)}`);
+          this.actorRegistry.emit('sectionWaveInitiate', { 
+            sectionId: this.sectionId,
+            readyFanCount: this.readyFanCount,
+            avgHappiness: avgHappiness  // Hybrid: pass section state for wave success calculation
+          });
+        }
+      }
+    } else if (previousReadyCount >= gameBalance.waveAutonomous.minReadyFans && this.readyFanCount < gameBalance.waveAutonomous.minReadyFans) {
+      // Log when we DROP below gate threshold
+      const elapsed = this.sceneStartTime > 0 ? (Date.now() - this.sceneStartTime) / 1000 : 0;
+      console.log(`[${elapsed.toFixed(1)}s] [Section ${this.sectionId}] Wave gate CLOSED: ${this.readyFanCount} ready fans (threshold: ${gameBalance.waveAutonomous.minReadyFans})`);
+    }
   }
 
   /**
@@ -684,6 +810,191 @@ private lastLoggedTargetFan: number = 0;
     // Start all fans in this column (don't await - allows smooth overlapping animations)
     Promise.all(columnPromises).catch(err => {
       // console.error('Error during column animation:', err);
+    });
+  }
+
+  /**
+   * Public method called by GameStateManager to flag this section for decay this frame
+   */
+  public flagForDecay(): void {
+    this.shouldDecayThisFrame = true;
+  }
+
+  /**
+   * Apply cluster-based happiness decay (Phase 5.1)
+   * Selects random seed fan, finds adjacent fans, applies decay to cluster
+   */
+  private applyClusterDecay(sessionTime: number, intervalUsed: number): void {
+    const fanActors = this.getFanActors();
+    if (fanActors.length === 0) return;
+    
+    // Count ready fans BEFORE decay
+    const readyBefore = fanActors.filter(f => f.isWaveReady()).length;
+    
+    // 1. Pick random seed fan
+    const seed = fanActors[Math.floor(Math.random() * fanActors.length)];
+    if (!this.gridManager) return;
+    
+    const seedGrid = seed.getGridPosition();
+    if (!seedGrid) return;
+    
+    // 2. Find adjacent fans (radius: 2)
+    const adjacent = this.getAdjacentFans(seedGrid.row, seedGrid.col, gameBalance.clusterDecay.adjacencyRadius);
+    
+    if (adjacent.length === 0) return;
+    
+    // 3. Select 3-7 fans from pool
+    const clusterSize = Math.floor(
+      Math.random() * (gameBalance.clusterDecay.clusterSizeMax - gameBalance.clusterDecay.clusterSizeMin + 1)
+    ) + gameBalance.clusterDecay.clusterSizeMin;
+    
+    const cluster = adjacent
+      .sort(() => Math.random() - 0.5)
+      .slice(0, Math.min(clusterSize, adjacent.length));
+    
+    // 4. Calculate decay rate based on session time
+    let decayRate = gameBalance.clusterDecay.earlyDecayRate;
+    if (sessionTime > gameBalance.clusterDecay.midPhaseEnd) {
+      decayRate = gameBalance.clusterDecay.lateDecayRate;
+    } else if (sessionTime > gameBalance.clusterDecay.earlyPhaseEnd) {
+      decayRate = gameBalance.clusterDecay.midDecayRate;
+    }
+    
+    // Attention decays at 2-3x the rate of happiness
+    const attentionDecayRate = decayRate * 2.5;
+    
+    // 5. Apply decay to cluster (time since last decay) with randomization
+    const timeSinceLastDecay = intervalUsed / 1000; // convert ms to seconds
+    
+    const elapsed = this.sceneStartTime > 0 ? (Date.now() - this.sceneStartTime) / 1000 : 0;
+    console.log(`[${elapsed.toFixed(1)}s] [Decay] Section ${this.sectionId}: seed(${seedGrid.row},${seedGrid.col}), pool=${adjacent.length}, selected=${cluster.length}/${clusterSize}, ${readyBefore} ready before`);
+    
+    // Sample first 3 fans for detailed logging
+    const happinessSamples: Array<{before: number, decay: number, after: number}> = [];
+    
+    cluster.forEach(fan => {
+      // Apply decay to all fans in cluster (no state exemptions for aggressive spiral)
+      // Randomize decay amounts: base ± 20% variance
+      const happinessVariance = 0.8 + Math.random() * 0.4; // 0.8 - 1.2
+      const attentionVariance = 0.8 + Math.random() * 0.4; // 0.8 - 1.2
+      
+      let happinessDecay = decayRate * timeSinceLastDecay * happinessVariance;
+      let attentionDecay = attentionDecayRate * timeSinceLastDecay * attentionVariance;
+      
+      // Cap maximum decay per fan (attention only - happiness uncapped for aggressive spiral)
+      attentionDecay = Math.min(gameBalance.clusterDecay.attentionDecayCap, attentionDecay);
+      
+      // Sample first 3 fans for detailed logging
+      const happinessBefore = fan.getHappiness();
+      
+      // Apply happiness and attention decay
+      fan.modifyStats({ happiness: -happinessDecay, attention: -attentionDecay });
+      
+      // Log sample
+      if (happinessSamples.length < 3) {
+        happinessSamples.push({
+          before: happinessBefore,
+          decay: happinessDecay,
+          after: fan.getHappiness()
+        });
+      }
+      
+      // Visual feedback: scale pop + pink outline flash for debug
+      const sprite = fan.getSprite();
+      if (sprite && sprite.scene) {
+        sprite.scene.tweens.add({
+          targets: sprite,
+          scaleX: 1.1,
+          scaleY: 1.1,
+          duration: 150,
+          yoyo: true,
+        });
+        
+        // Debug visual: pink outline flash (bright magenta)
+        sprite.scene.tweens.add({
+          targets: sprite,
+          outlineStrokeColor: 0xFF00FF, // Bright magenta
+          outlineStrokeThickness: 4,
+          duration: 100,
+          onComplete: () => {
+            sprite.scene.tweens.add({
+              targets: sprite,
+              outlineStrokeColor: 0x000000, // Back to black
+              outlineStrokeThickness: 0,
+              duration: 200,
+              
+            });
+          }
+        });
+      }
+    });
+    
+    // Log ready count after decay for comparison
+    const readyAfter = fanActors.filter(f => f.isWaveReady()).length;
+    const elapsedEnd = this.sceneStartTime > 0 ? (Date.now() - this.sceneStartTime) / 1000 : 0;
+    const sampleStr = happinessSamples.map(s => `${s.before.toFixed(0)}→${s.after.toFixed(0)} (-${s.decay.toFixed(1)})`).join(', ');
+    console.log(`[${elapsedEnd.toFixed(1)}s] [Decay] Section ${this.sectionId}: ready fans ${readyBefore} → ${readyAfter}, samples: ${sampleStr}`);
+  }
+
+  /**
+   * Get fans adjacent to given position within Manhattan radius
+   */
+  private getAdjacentFans(row: number, col: number, radius: number): FanActor[] {
+    const fanActors = this.getFanActors();
+    const adjacent: FanActor[] = [];
+    
+    if (!this.gridManager) return adjacent;
+    
+    for (const fan of fanActors) {
+      const grid = fan.getGridPosition();
+      
+      const manhattanDist = Math.abs(grid.row - row) + Math.abs(grid.col - col);
+      if (manhattanDist <= radius && manhattanDist > 0) {
+        adjacent.push(fan);
+      }
+    }
+    
+    return adjacent;
+  }
+
+  /**
+   * Start blink effect for auto-wave countdown (Phase 5.4)
+   * Shows 3px light blue border, 5 blinks over 2.25 seconds
+   */
+  private startBlinkEffect(countdown: number): void {
+    const scene = this.section.scene;
+    if (!scene) return;
+
+    // Get section bounds for border graphics
+    const bounds = this.section.getBounds();
+    
+    // Create graphics object for border (will be destroyed after animation)
+    const borderGraphics = scene.add.graphics();
+    borderGraphics.lineStyle(3, 0x00BFFF, 1); // 3px light blue
+    // bounds.x and bounds.y are already top-left corner
+    borderGraphics.strokeRect(
+      bounds.x,
+      bounds.y,
+      bounds.width,
+      bounds.height
+    );
+    
+    // Set depth to appear above section but below UI
+    borderGraphics.setDepth(1000);
+
+    // Blink animation: 5 cycles over 2.25 seconds
+    // Each cycle: 225ms visible, 225ms hidden = 450ms per blink
+    // Use yoyo + repeat for smooth blinking
+    scene.tweens.add({
+      targets: borderGraphics,
+      alpha: 0,
+      duration: 225,
+      yoyo: true,
+      repeat: 4, // 5 total blinks (initial + 4 repeats)
+      ease: 'Linear',
+      onComplete: () => {
+        borderGraphics.destroy();
+      }
     });
   }
 }

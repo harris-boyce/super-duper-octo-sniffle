@@ -11,6 +11,7 @@ export class ActorRegistry {
   private actors: Map<string, Actor> = new Map();
   private byCategory: Map<ActorCategory, Set<string>> = new Map();
   private logger = LoggerService.instance();
+  private eventListeners: Map<string, Function[]> = new Map();
 
   /**
    * Type-safe lookup for a registered actor by id and type.
@@ -153,6 +154,23 @@ export class ActorRegistry {
    */
   public countByCategory(category: ActorCategory): number {
     return this.byCategory.get(category)?.size ?? 0;
+  }
+
+  /**
+   * Event emitter methods (for inter-actor communication)
+   */
+  public on(event: string, callback: Function): void {
+    if (!this.eventListeners.has(event)) {
+      this.eventListeners.set(event, []);
+    }
+    this.eventListeners.get(event)!.push(callback);
+  }
+
+  public emit(event: string, data?: any): void {
+    const listeners = this.eventListeners.get(event);
+    if (listeners) {
+      listeners.forEach(callback => callback(data));
+    }
   }
 }
 

@@ -230,6 +230,7 @@ export class StadiumScene extends Phaser.Scene {
 
     // Create SectionActors from level data (Actor-first, data-driven!)
     const sectionActors: SectionActor[] = [];
+    const sceneStartTime = Date.now();
     levelData.sections.forEach((sectionData) => {
       const actorId = ActorFactory.generateId('section', sectionData.id);
       const sectionActor = new SectionActor(
@@ -242,6 +243,7 @@ export class StadiumScene extends Phaser.Scene {
         false
       );
       sectionActor.populateFromData(sectionData.fans);
+      sectionActor.setSceneStartTime(sceneStartTime); // Set timestamp for logging
       this.actorRegistry.register(sectionActor);
       sectionActors.push(sectionActor);
       this.sections.push(sectionActor.getSection());
@@ -321,6 +323,9 @@ export class StadiumScene extends Phaser.Scene {
 
     // Listen to vendor events BEFORE spawning (important!)
     this.setupVendorEventListeners();
+    
+    // Listen to auto-wave initiation events from sections (Phase 5.3)
+    this.setupAutoWaveListeners();
 
     // Spawn vendors at positions from level data
     if (levelData.vendors && this.gridManager) {
@@ -692,6 +697,11 @@ export class StadiumScene extends Phaser.Scene {
       // Note: WaveSprite now spawns when countdown reaches zero, not here
     });
 
+    // Forward waveCountdownStarted event to actorRegistry for section blink effect (Phase 5.4)
+    this.waveManager.on('waveCountdownStarted', (data: { sectionId: string; countdown: number }) => {
+      this.actorRegistry.emit('waveCountdownStarted', data);
+    });
+
     // Listen to wave strength changes
     this.waveManager.on('waveStrengthChanged', (data: { strength: number }) => {
       this.updateWaveStrengthMeter(data.strength);
@@ -996,17 +1006,9 @@ export class StadiumScene extends Phaser.Scene {
       this.overlayManager.update(delta);
     }
 
-    // Check for autonomous wave triggering (only when session is active)
-    if (gameBalance.waveAutonomous.enabled && 
-        !this.waveManager.isActive() && 
-        this.gameState.getSessionState() === 'active') {
-      const triggerSection = this.waveManager.checkWaveProbability();
-      if (triggerSection) {
-        const wave = this.waveManager.createWave(triggerSection);
-        this.showIncomingCue(triggerSection);
-        // console.log(`[Wave] Autonomous start section ${triggerSection} waveId=${wave.id}`);
-      }
-    }
+    // Auto-wave triggering is now handled exclusively via sectionWaveInitiate events from SectionActor
+    // (when fans reach wave readiness threshold: happiness >= 85 AND attention >= 50)
+    // This ensures waves only trigger when the underlying fan state supports them.
 
     // Update wave countdown if active
     if (this.waveManager.isActive()) {
@@ -1200,6 +1202,12 @@ export class StadiumScene extends Phaser.Scene {
             this.gameState.activateSession();
             // Set session start time for autonomous wave delay
             this.waveManager.setSessionStartTime(Date.now());
+            
+            // Activate session timing in all SectionActors (enables autonomous logic after grace period)
+            const sectionActors = this.actorRegistry.getByCategory('section') as SectionActor[];
+            for (const sectionActor of sectionActors) {
+              sectionActor.activateSession();
+            }
           });
         }
       },
@@ -1772,6 +1780,24 @@ export class StadiumScene extends Phaser.Scene {
   }
 
   /**
+   * Setup auto-wave initiation event listeners (Phase 5.3)
+   * Sections emit when enough fans reach happiness threshold
+   */
+  private setupAutoWaveListeners(): void {
+    this.actorRegistry.on('sectionWaveInitiate', (data: { sectionId: string; readyFanCount: number }) => {
+      console.log(`[Auto-Wave] Section ${data.sectionId} initiating wave (${data.readyFanCount} fans ready)`);
+      
+      // Check if wave already on cooldown
+      if (!this.waveManager.isWaveOnCooldown()) {
+        // Start wave from this section
+        this.waveManager.createWave(data.sectionId);
+      } else {
+        console.log(`[Auto-Wave] Cannot start wave: wave on cooldown, ignoring section ${data.sectionId} initiation`);
+      }
+    });
+  }
+
+  /**
    * Setup mascot keyboard controls
    */
   private setupMascotKeyboardControls(): void {
@@ -1857,6 +1883,12 @@ export class StadiumScene extends Phaser.Scene {
 
     // Target button - enters mascot targeting mode
     targetBtn.addEventListener('click', () => {
+      // Block interaction during countdown
+      const sessionState = this.gameState.getSessionState();
+      if (sessionState === 'countdown' || sessionState === 'idle') {
+        return;
+      }
+      
       if (this.mascotTargetingActive) {
         this.exitMascotTargetingMode();
       } else {
@@ -1866,6 +1898,12 @@ export class StadiumScene extends Phaser.Scene {
 
     // Ultimate button - fires ultimate ability
     ultimateBtn.addEventListener('click', () => {
+      // Block interaction during countdown
+      const sessionState = this.gameState.getSessionState();
+      if (sessionState === 'countdown' || sessionState === 'idle') {
+        return;
+      }
+      
       if (this.mascotActors.length === 0) return;
       
       const mascot = this.mascotActors[0];
@@ -2040,6 +2078,12 @@ export class StadiumScene extends Phaser.Scene {
       }
 
       btn.onclick = () => {
+        // Block interaction during countdown
+        const sessionState = this.gameState.getSessionState();
+        if (sessionState === 'countdown' || sessionState === 'idle') {
+          return;
+        }
+        
         const liveCooldown = this.aiManager.isVendorOnCooldown(vendorId);
         if (liveCooldown) {
           // console.log(`[VendorControls] Click ignored; vendor ${vendorId} still on cooldown`);
